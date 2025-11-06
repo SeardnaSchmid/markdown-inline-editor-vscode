@@ -2,20 +2,7 @@ import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import { visit } from "unist-util-visit";
-import {
-  Root,
-  Heading,
-  InlineCode,
-  Code,
-  Node,
-  Strong,
-  Emphasis,
-  Delete,
-  Link,
-  Image,
-  LinkReference,
-  ImageReference,
-} from "mdast";
+import { Root, Heading, Node, Strong } from "mdast";
 
 export interface DecorationRange {
   startPos: number;
@@ -267,7 +254,7 @@ class HorizontalRuleHandler extends BaseNodeHandler {
     return node.type === "thematicBreak";
   }
 
-  extractDecorations(node: Node, text: string): DecorationRange[] {
+  extractDecorations(node: Node, _text: string): DecorationRange[] {
     if (!this.hasValidPosition(node)) {
       return [];
     }
@@ -349,11 +336,6 @@ class CodeBlockHandler extends BaseNodeHandler {
     // This will skip the opening fence, language identifier (if present), and any whitespace/newlines
     const openingFenceEnd = startOffset + fenceLength;
     const contentStart = this.findContentStart(
-      text,
-      openingFenceEnd,
-      closingFenceStart
-    );
-    const contentEnd = this.findContentEnd(
       text,
       openingFenceEnd,
       closingFenceStart
@@ -552,7 +534,7 @@ class InlineCodeHandler extends BaseNodeHandler {
     return node.type === "inlineCode";
   }
 
-  extractDecorations(node: Node, text: string): DecorationRange[] {
+  extractDecorations(node: Node, _text: string): DecorationRange[] {
     if (!this.hasValidPosition(node)) {
       return [];
     }
@@ -870,7 +852,7 @@ class DeleteHandler extends BaseNodeHandler {
     return node.type === "delete";
   }
 
-  extractDecorations(node: Node, text: string): DecorationRange[] {
+  extractDecorations(node: Node, _text: string): DecorationRange[] {
     if (!this.hasValidPosition(node)) {
       return [];
     }
@@ -922,7 +904,6 @@ class LinkHandler extends BaseNodeHandler {
       return [];
     }
 
-    const linkNode = node as Link;
     const startOffset = node.position.start.offset!;
     const endOffset = node.position.end.offset!;
 
@@ -1084,7 +1065,6 @@ class ImageHandler extends BaseNodeHandler {
       return [];
     }
 
-    const imageNode = node as Image;
     const startOffset = node.position.start.offset!;
     const endOffset = node.position.end.offset!;
 
@@ -1212,7 +1192,6 @@ class LinkReferenceHandler extends BaseNodeHandler {
       return [];
     }
 
-    const linkRefNode = node as LinkReference;
     const startOffset = node.position.start.offset!;
     const endOffset = node.position.end.offset!;
 
@@ -1322,7 +1301,6 @@ class ImageReferenceHandler extends BaseNodeHandler {
       return [];
     }
 
-    const imageRefNode = node as ImageReference;
     const startOffset = node.position.start.offset!;
     const endOffset = node.position.end.offset!;
 
@@ -1616,7 +1594,6 @@ export class MarkdownParser {
     const allDecorations = collector.getAll();
     const filteredDecorations = allDecorations.filter((dec) => {
       if (dec.type === "italic") {
-        const key = `${dec.startPos}-${dec.endPos}`;
         // Check if this range overlaps with a bold-italic emphasis range
         for (const rangeKey of boldItalicEmphasisRanges) {
           const parts = rangeKey.split("-");

@@ -1,4 +1,4 @@
-import { Range, TextEditor } from "vscode";
+import { Range, TextEditor, TextEditorDecorationType } from "vscode";
 import {
   HideDecorationType,
   BoldDecorationType,
@@ -48,7 +48,7 @@ export class Decorator {
   private decorationsEnabled: boolean = true;
   private parser = new MarkdownParser();
 
-  private decorationTypes: Record<DecorationKey, any>;
+  private decorationTypes: Record<DecorationKey, TextEditorDecorationType>;
 
   constructor() {
     // Initialize decoration types for each key
