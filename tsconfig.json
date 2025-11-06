@@ -1,0 +1,11 @@
+{
+  "extends": ["@tsconfig/node-lts/tsconfig.json"],
+  "include": ["src/**/*.ts"],
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  }
+}
