@@ -6,14 +6,15 @@
   "license": "MIT",
   "author": "SeardnaSchmid",
   "publisher": "seardnaschmid",
-  "private": "true",
+  "private": true,
+  "icon": "images/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/seardnaschmid/md-inline-editor-vscode.git"
+    "url": "https://github.com/SeardnaSchmid/markdown-inline-editor-vscode.git"
   },
-  "homepage": "https://github.com/seardnaschmid/md-inline-editor-vscode",
+  "homepage": "https://github.com/SeardnaSchmid/markdown-inline-editor-vscode",
   "bugs": {
-    "url": "https://github.com/seardnaschmid/md-inline-editor-vscode/issues"
+    "url": "https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues"
   },
   "keywords": [
     "markdown",
@@ -29,7 +30,7 @@
   },
   "categories": [
     "Formatters",
-    "Productivity",
+    "Visualization",
     "Other"
   ],
   "activationEvents": [
@@ -56,8 +57,12 @@
   },
   "scripts": {
     "lint": "eslint --ext .js,.jsx,.ts,.tsx .",
+    "test": "echo \"No tests specified\"",
     "clean": "rimraf dist",
-    "build": "tsc --project tsconfig.build.json && vsce package --out dist/extension.vsix",
+    "compile": "tsc --project tsconfig.build.json",
+    "package": "vsce package --out dist/extension.vsix",
+    "build": "npm run compile && npm run package",
+    "prepublishOnly": "npm run clean && npm run build",
     "deploy:prod": "npm run clean && npm run build && vsce publish --packagePath dist/extension.vsix --pat $AZURE_DEVOPS_TOKEN && ovsx publish dist/extension.vsix --pat $OPEN_VSX_TOKEN"
   },
   "dependencies": {
@@ -71,6 +76,8 @@
     "@types/node": "^20.12.5",
     "@types/unist": "^3.0.0",
     "@types/vscode": "^1.88.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
     "@vscode/vsce": "^3.6.2",
     "eslint": "^8.57.0",
     "ovsx": "^0.9.0",
