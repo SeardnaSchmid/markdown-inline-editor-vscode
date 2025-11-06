@@ -5,7 +5,7 @@
   "description": "WYSIWYG inline markdown editor - hide syntax, focus on content",
   "license": "MIT",
   "author": "SeardnaSchmid",
-  "publisher": "seardnaschmid",
+  "publisher": "CodeSmith",
   "private": true,
   "icon": "images/icon.png",
   "repository": {
