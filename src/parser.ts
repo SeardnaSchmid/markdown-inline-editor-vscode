@@ -729,9 +729,11 @@ export class MarkdownParser {
   /**
    * Processes a list item node.
    *
-   * Replaces list markers (-, *, +, 1., 2., etc.) with a bullet point (•).
-   * Detects and decorates checkboxes ([ ] or [x]) after the marker.
-   * Supports both unordered lists (-, *, +) and ordered lists (1., 2., etc.).
+   * For unordered lists (-, *, +): Replaces list markers with a bullet point (•).
+   * For ordered lists (1., 2., etc.): Leaves markers visible (displayed as-is).
+   * Detects and decorates checkboxes ([ ] or [x]) after the marker for both types.
+   * 
+   * Note: Ordered list auto-numbering is planned for a future release.
    */
   private processListItem(
     node: ListItem,
@@ -792,16 +794,15 @@ export class MarkdownParser {
           markerEnd++;
         }
         
-        // Try to detect and add checkbox, otherwise add regular list item decoration
+        // Try to detect and add checkbox
+        // For ordered lists without checkboxes, leave the marker visible (no decoration)
+        // Auto-numbering is planned for a future release
         if (this.tryAddCheckboxDecorations(text, markerStart, markerEnd, end, decorations)) {
           return;
         }
         
-        decorations.push({
-          startPos: markerStart,
-          endPos: markerEnd,
-          type: 'listItem',
-        });
+        // Ordered lists without checkboxes should not be decorated (displayed as-is)
+        // This prevents ordered lists from being rendered as unordered lists with bullets
         return;
       }
     }

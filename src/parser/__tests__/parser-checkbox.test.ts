@@ -201,8 +201,9 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       // Should NOT detect as checkbox (GFM requires space after ])
       expect(result.some(d => d.type === 'checkboxUnchecked')).toBe(false);
       expect(result.some(d => d.type === 'checkboxChecked')).toBe(false);
-      // Should still be a regular list item
-      expect(result.some(d => d.type === 'listItem')).toBe(true);
+      // Ordered lists without valid checkboxes should not get listItem decoration
+      // They should be displayed as-is (markers visible)
+      expect(result.some(d => d.type === 'listItem')).toBe(false);
     });
 
     it('should NOT detect checked checkbox without space after bracket (GFM spec)', () => {

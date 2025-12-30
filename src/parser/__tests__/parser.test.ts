@@ -114,5 +114,50 @@ describe('MarkdownParser', () => {
       }
     });
   });
+
+  describe('ordered lists', () => {
+    it('should not apply listItem decoration to ordered lists without checkboxes', () => {
+      const markdown = '1. First item\n2. Second item\n3. Third item';
+      const result = parser.extractDecorations(markdown);
+      
+      // Ordered lists without checkboxes should not have listItem decorations
+      // They should be displayed as-is (markers visible)
+      const listItemDecorations = result.filter(d => d.type === 'listItem');
+      expect(listItemDecorations.length).toBe(0);
+    });
+
+    it('should handle ordered lists with dot markers', () => {
+      const markdown = '1. Item one\n2. Item two';
+      const result = parser.extractDecorations(markdown);
+      
+      const listItemDecorations = result.filter(d => d.type === 'listItem');
+      expect(listItemDecorations.length).toBe(0);
+    });
+
+    it('should handle ordered lists with parentheses markers', () => {
+      const markdown = '1) Item one\n2) Item two';
+      const result = parser.extractDecorations(markdown);
+      
+      const listItemDecorations = result.filter(d => d.type === 'listItem');
+      expect(listItemDecorations.length).toBe(0);
+    });
+
+    it('should handle multi-digit ordered list numbers', () => {
+      const markdown = '123. Item one\n456. Item two';
+      const result = parser.extractDecorations(markdown);
+      
+      const listItemDecorations = result.filter(d => d.type === 'listItem');
+      expect(listItemDecorations.length).toBe(0);
+    });
+
+    it('should still apply listItem decoration to ordered lists with checkboxes', () => {
+      const markdown = '1. [ ] Task item';
+      const result = parser.extractDecorations(markdown);
+      
+      // Ordered lists with checkboxes should have listItem decoration
+      const listItemDecorations = result.filter(d => d.type === 'listItem');
+      expect(listItemDecorations.length).toBeGreaterThan(0);
+    });
+  });
 });
 
