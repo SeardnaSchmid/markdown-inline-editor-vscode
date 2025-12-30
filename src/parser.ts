@@ -795,8 +795,6 @@ export class MarkdownParser {
         }
         
         // Try to detect and add checkbox
-        // For ordered lists without checkboxes, leave the marker visible (no decoration)
-        // Auto-numbering is planned for a future release
         if (this.tryAddCheckboxDecorations(text, markerStart, markerEnd, end, decorations)) {
           return;
         }
