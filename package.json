@@ -64,7 +64,7 @@
         },
         "mdInline.cursorLineDisables": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "Expand selection to full lines before hiding intersecting decorations"
         }
       }

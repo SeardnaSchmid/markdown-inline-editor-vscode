@@ -76,7 +76,7 @@ export class Decorator {
   private cursorDisables: boolean = true;
 
   /** Whether to expand selection to full lines before hiding intersecting decorations */
-  private cursorLineDisables: boolean = true;
+  private cursorLineDisables: boolean = false;
 
   /** Maximum character offset to consider a hide decoration as being at line start (for heading detection) */
   private readonly MAX_HEADING_MARKER_OFFSET = 10;
@@ -851,7 +851,7 @@ export class Decorator {
   private updateCursorConfigInternal(): void {
     const config = workspace.getConfiguration('mdInline');
     this.cursorDisables = config.get<boolean>('cursorDisables', true);
-    this.cursorLineDisables = config.get<boolean>('cursorLineDisables', true);
+    this.cursorLineDisables = config.get<boolean>('cursorLineDisables', false);
   }
 
   /**
