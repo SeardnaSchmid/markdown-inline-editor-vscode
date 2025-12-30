@@ -9,11 +9,12 @@
 ## ✨ Key Features
 
 * **Hide syntax** – No more `**`, `~~`, backticks cluttering your view
-* **Smart reveal** – Click any text to instantly see/edit raw Markdown  
+* **Smart reveal** – Decorations automatically hide around cursor/selection to show raw Markdown  
+* **Heading support** – Click on headings to see `#` markers and normal font size while editing
 * **Fast** – Intelligent caching, no lag on selection changes
 * **Compatible** – Standard `.md` files, works with any tool
 * **Theme-aware** – Automatically adapts to your VS Code theme
-* **Zero configuration** – Works out of the box
+* **Configurable** – Customize cursor-based decoration hiding behavior
 
 ## Demo
 
@@ -41,8 +42,9 @@
 - **Code blocks** – Fences hidden, background styled with theme colors
 - **Blockquotes** – `> quote` → │ quote (visual bar indicator)
 - **Horizontal rules** – `---` → ─────── (visual separator)
-- **Instant reveal** – Select text to see/edit raw Markdown
-- **Fast** – Intelligent caching + incremental updates
+- **Smart editing** – Decorations automatically hide around cursor/selection to reveal raw Markdown
+- **Heading support** – Click on headings to reveal `#` markers and return to normal font size
+- **Fast performance** – Intelligent caching + incremental updates
 - **Toggle anytime** – Toolbar button to enable/disable
 
 ## Recommended additional Extensions
@@ -80,7 +82,7 @@ Press `Ctrl+P` / `Cmd+P`, type `ext install CodeSmith.markdown-inline-editor-vsc
 
 ## Supported Features
 
-Currently we support the following features:
+### Markdown Syntax
 
 - [x] **Bold** – `**text**` → **text** (markers hidden)
 - [x] **Italic** – `*text*` → *text* (markers hidden)
@@ -91,33 +93,34 @@ Currently we support the following features:
 - [x] **Links** – `[text](url)` → Ctrl Clickable, URL hidden
 - [x] **Images** – `![alt](img.png)` → Alt text styled
 - [x] **Unordered Lists** – `- item` or `* item` or `+ item` → • item
-- [x] **Task Lists** – `- [ ]` / `- [ ]` → ☐ / ☑
-  - [x] **Clickable Checkboxes** – Click inside the checkbox to toggle completion status
-  - [x] **Ordered List Task Lists** – `1. [ ] task` / `1) [ ] task` → ☐ / ☑
-  - [x] **Asterisk/Plus Task Lists** – `* [ ] task` / `+ [ ] task` → ☐ / ☑
-  - [x] **Edge Case Handling** – Handles missing spaces and invalid syntax gracefully
-  - [x] **Smart Click Behavior** – Raw markdown only shows when clicking behind checkbox, not on it
+- [x] **Task Lists** – `- [ ]` / `- [x]` → ☐ / ☑
+  - Supports ordered lists (`1. [ ] task`), asterisk/plus variants (`* [ ] task`, `+ [ ] task`)
+  - Click checkbox to toggle, click elsewhere to see raw Markdown
+  - Handles edge cases (missing spaces, invalid syntax)
 - [x] **Blockquotes** – `> quote` → │ quote (visual bar)
 - [x] **Nested Blockquotes** – `> > nested` → │ │ nested
 - [x] **Horizontal Rules** – `---` or `***` or `___` → ─────── (visual separator)
 - [x] **Code Blocks** – ` ```lang ` → Background styled, fences hidden
 
-**Nested formatting fully supported** (e.g., **bold *italic***, `**bold `code`**`).
+### Editing Features
 
-**Note:** Ordered lists (`1.`, `2.`, etc.) are currently displayed as-is. Auto-numbering is planned for a future release.
+- [x] **Cursor-based raw code display** – Decorations automatically hide around cursor/selection to reveal raw Markdown
+- [x] **Heading editing** – Click on headings to see `#` markers and normal font size
+- [x] **Smart checkbox handling** – Click checkbox to toggle, click elsewhere on line to see raw Markdown
+
+**Nested formatting fully supported** (e.g., **bold *italic***, `**bold `code`**`).
 
 ## Upcoming Features
 
 We're continuously improving the extension! Here's what's coming next:
 
 ### Critical Priority (Current focus)
-
-- [x] **Task Lists Enhancement** – Support for task lists in ordered lists, asterisk/plus variants, and edge case handling
-  - [x] Support task lists in ordered lists (`1. [ ] task`)
-  - [x] Support task lists with asterisk/plus (`* [ ] task`, `+ [ ] task`)
-  - [x] Handle edge cases (missing spaces, invalid syntax)
-  - [x] No Markdown raw view when clicking on the checkbox, only when clicking behind the checkbox
-  - [x] Bugfix: checkbox in ordered/unordered list should be rendered correctly
+- [ ] **Ordered List Auto-Numbering** – Hide markers and show auto-numbered items (1, 2, 3...), including support for nested lists
+  - [ ] Hide list markers (`1.`, `2.`, etc.)
+  - [ ] Show auto-numbered items (1, 2, 3...)
+  - [ ] Handle nested ordered lists
+  - [ ] Support GFM parentheses variant (`1)` vs `1.`)
+  - [ ] Handle out-of-order numbering gracefully
 
 ### High Priority (Must have)
 
@@ -134,12 +137,6 @@ We're continuously improving the extension! Here's what's coming next:
   - [ ] Hide frontmatter delimiters (`---`)
   - [ ] Display as code blocks or at least to some degree as visual distinct
   - [ ] Support frontmatter editing (reveal on selection)
-- [ ] **Ordered List Auto-Numbering** – Hide markers and show auto-numbered items (1, 2, 3...), including support for nested lists
-  - [ ] Hide list markers (`1.`, `2.`, etc.)
-  - [ ] Show auto-numbered items (1, 2, 3...)
-  - [ ] Handle nested ordered lists
-  - [ ] Support GFM parentheses variant (`1)` vs `1.`)
-  - [ ] Handle out-of-order numbering gracefully
 - [ ] **Autolinks** – Automatic link detection for `<https://...>` URLs and `<email@example.com>` email addresses
   - [ ] URL autolinks (`<https://...>`)
   - [ ] Email autolinks (`<email@example.com>`)
@@ -196,6 +193,42 @@ We're continuously improving the extension! Here's what's coming next:
 
 The toggle state is global (applies to all markdown files). Per-file toggle state is planned for a future release.
 
+### Cursor-Based Decoration Hiding
+
+The extension automatically hides decorations around your cursor or selection to reveal raw Markdown syntax. Customize this behavior with the following settings:
+
+#### `mdInline.cursorDisables` (default: `true`)
+
+Hide decorations that intersect with cursor or selection. When enabled, decorations automatically hide around your cursor position or selected text, revealing the raw Markdown syntax for editing.
+
+**Example:** When your cursor is on `**bold text**`, the bold decoration hides and you see the raw `**bold text**` syntax.
+
+#### `mdInline.cursorLineDisables` (default: `false`)
+
+Expand selection to full lines before hiding intersecting decorations. When enabled, the extension treats your cursor position as if the entire line is selected, hiding all decorations on that line.
+
+**Use case:** Useful when you want to see all raw Markdown on a line, not just around the cursor position.
+
+#### Special Behavior for Headings
+
+When you click on a heading line:
+- The `#` markers become visible (hide decoration is removed)
+- Font size returns to normal (heading font-size decoration is hidden)
+- Other inline decorations (bold, italic, etc.) remain applied
+
+This makes it easy to edit heading levels while keeping other formatting visible.
+
+### Configuration Example
+
+Add to your VS Code `settings.json`:
+
+```json
+{
+  "mdInline.cursorDisables": true,
+  "mdInline.cursorLineDisables": false
+}
+```
+
 ## Development
 
 ### Prerequisites
@@ -237,7 +270,7 @@ src/
 ├── decorator.ts          # Decoration management and caching
 ├── decorations.ts        # VS Code decoration type definitions
 ├── link-provider.ts      # Clickable link provider
-└── parser/__tests__/     # Comprehensive test suite (123+ tests)
+└── parser/__tests__/     # Comprehensive test suite (215+ tests)
 ```
 
 **Key Technologies:**
@@ -271,9 +304,9 @@ See [`AGENTS.md`](AGENTS.md) for contribution guidelines and agent roles, and [`
 
 ### Known Limitations
 
-- **Ordered lists** – Currently displayed as-is (auto-numbering planned)
-- **Tables** – Table syntax hiding is in progress
-- **Mermaid diagrams** – Diagram rendering is in progress
+- **Ordered lists** – Currently displayed as-is (auto-numbering planned for future release)
+- **Tables** – Table syntax hiding is planned
+- **Mermaid diagrams** – Diagram rendering is planned
 - **Math formulas** – KaTeX/MathJax support is planned
 
 ### Found a Bug?
@@ -304,7 +337,7 @@ git commit -m "feat(parser): add definition list support"
 - **Code style:** TypeScript strict mode, JSDoc comments, comprehensive tests
 - **Commit format:** `<type>(<scope>): <description>`
   - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
-- **Testing:** All changes must include tests (123+ existing tests)
+- **Testing:** All changes must include tests (215+ existing tests)
 - **Performance:** No regressions – see [`docs/PERFORMANCE_IMPROVEMENTS.md`](docs/project/additional-docs/PERFORMANCE_IMPROVEMENTS.md)
 
 ### Feature Requests
