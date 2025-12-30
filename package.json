@@ -53,6 +53,21 @@
           "group": "navigation"
         }
       ]
+    },
+    "configuration": {
+      "title": "Markdown Inline Editor",
+      "properties": {
+        "mdInline.cursorDisables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide decorations that intersect with cursor or selection"
+        },
+        "mdInline.cursorLineDisables": {
+          "type": "boolean",
+          "default": false,
+          "description": "Expand selection to full lines before hiding intersecting decorations"
+        }
+      }
     }
   },
   "scripts": {

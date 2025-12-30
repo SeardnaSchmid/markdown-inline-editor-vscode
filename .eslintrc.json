@@ -34,7 +34,8 @@
     "node_modules",
     "coverage",
     "test-report",
-    "*.js"
+    "*.js",
+    "context-example-repositories/**/*"
   ]
 }
 

@@ -94,9 +94,18 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
+  // Listen for configuration changes and update decorations
+  const changeConfiguration = vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('mdInline.cursorDisables') || 
+        event.affectsConfiguration('mdInline.cursorLineDisables')) {
+      decorator.updateCursorConfig();
+    }
+  });
+
   context.subscriptions.push(changeActiveTextEditor);
   context.subscriptions.push(changeTextEditorSelection);
   context.subscriptions.push(changeDocument);
+  context.subscriptions.push(changeConfiguration);
   context.subscriptions.push(linkProviderDisposable);
   context.subscriptions.push(toggleDecorationsCommand);
   context.subscriptions.push(navigateToAnchorCommand);

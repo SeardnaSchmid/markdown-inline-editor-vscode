@@ -1,9 +1,17 @@
 {
   "extends": "@tsconfig/node-lts/tsconfig.json",
   "compilerOptions": {
-    "isolatedModules": true
+    "isolatedModules": true,
+    "downlevelIteration": true
   },
   "include": [
     "src/**/*.ts"
   ],
+  "exclude": [
+    "context-example-repositories",
+    "context-example-repositories/**",
+    "context-example-repositories/**/*",
+    "node_modules/**/*",
+    "dist/**/*"
+  ]
 }
