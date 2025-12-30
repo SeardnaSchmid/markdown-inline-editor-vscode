@@ -1,17 +1,44 @@
 {
-  // Mermaid diagram settings
-  "markdown.mermaid.theme": "default",
-  
-  // Markdown preview settings
-  "markdown.preview.breaks": true,
-  
-  // Mermaid Preview extension settings (if installed)
-  "mermaid.theme": "default",
-  
-  // Markdown Preview Enhanced settings (if installed)
-  "markdown-preview-enhanced.mermaidTheme": "default",
-  "markdown-preview-enhanced.enableScriptExecution": false,
-  
-  // Custom CSS for markdown preview (minimal - let Mermaid defaults work)
-  "markdown.styles": [".vscode/markdown-preview-custom.css"]
+
+    
+  // Exclude context-example-repositories from TypeScript and ESLint
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.excludePackageJsonAutoImports": "off",
+  "typescript.validate.enable": true,
+  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+  "typescript.preferences.includePackageJsonAutoImports": "off",
+  "typescript.disableAutomaticTypeAcquisition": false,
+  "javascript.validate.enable": true,
+  "typescript.tsserver.watchOptions": {
+    "excludeDirectories": [
+      "**/context-example-repositories"
+    ]
+  },
+  "files.exclude": {
+    "**/context-example-repositories": false
+  },
+  "files.associations": {
+    "context-example-repositories/**/*.js": "plaintext",
+    "context-example-repositories/**/*.ts": "plaintext"
+  },
+  "files.watcherExclude": {
+    "**/context-example-repositories/**": true
+  },
+  "search.exclude": {
+    "**/context-example-repositories": true
+  },
+  "eslint.ignorePatterns": [
+    "context-example-repositories/**/*"
+  ],
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.options": {
+    "ignorePattern": [
+      "context-example-repositories/**/*"
+    ]
+  }
 }

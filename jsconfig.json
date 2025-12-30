@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "checkJs": false
+  },
+  "exclude": [
+    "context-example-repositories",
+    "context-example-repositories/**",
+    "context-example-repositories/**/*",
+    "node_modules",
+    "dist"
+  ]
+}

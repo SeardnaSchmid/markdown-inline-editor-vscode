@@ -1,4 +1,5 @@
-import { TextDocument, Uri } from '../../test/__mocks__/vscode';
+import { TextDocument as MockTextDocument, Uri } from '../../test/__mocks__/vscode';
+import type { TextDocument } from 'vscode';
 import { createCRLFText } from '../../parser/__tests__/helpers/crlf-helpers';
 
 describe('Decorator - Cache with CRLF', () => {
@@ -9,7 +10,7 @@ describe('Decorator - Cache with CRLF', () => {
   describe('CRLF text in documents', () => {
     it('should preserve CRLF text in TextDocument', () => {
       const crlfText = createCRLFText('# Heading\n**bold**');
-      const document = new TextDocument(
+      const document = new MockTextDocument(
         Uri.file('test.md'),
         'markdown',
         1,
@@ -26,13 +27,13 @@ describe('Decorator - Cache with CRLF', () => {
       
       for (let i = 0; i < 5; i++) {
         const crlfText = createCRLFText(`# Document ${i}\n**bold**`);
-        const doc = new TextDocument(
+        const doc = new MockTextDocument(
           Uri.file(`test${i}.md`),
           'markdown',
           1,
           crlfText
         );
-        documents.push(doc);
+        documents.push(doc as any);
       }
       
       // Verify all documents preserve CRLF
@@ -44,7 +45,7 @@ describe('Decorator - Cache with CRLF', () => {
 
     it('should handle document version changes with CRLF', () => {
       const crlfText1 = createCRLFText('# Heading 1');
-      const document1 = new TextDocument(
+      const document1 = new MockTextDocument(
         Uri.file('test.md'),
         'markdown',
         1,
@@ -53,7 +54,7 @@ describe('Decorator - Cache with CRLF', () => {
       
       // Change document
       const crlfText2 = createCRLFText('# Heading 2');
-      const document2 = new TextDocument(
+      const document2 = new MockTextDocument(
         Uri.file('test.md'),
         'markdown',
         2,

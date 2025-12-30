@@ -7,5 +7,8 @@
   },
   "exclude": [
     "**/*.test.ts",
-  ],
+    "context-example-repositories/**/*",
+    "node_modules/**/*",
+    "dist/**/*"
+  ]
 }

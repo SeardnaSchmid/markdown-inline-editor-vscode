@@ -72,6 +72,15 @@ export class Decorator {
   /** Whether decorations are enabled or disabled */
   private decorationsEnabled = true;
 
+  /** Whether to hide decorations that intersect with cursor/selection */
+  private cursorDisables: boolean = true;
+
+  /** Whether to expand selection to full lines before hiding intersecting decorations */
+  private cursorLineDisables: boolean = true;
+
+  /** Maximum character offset to consider a hide decoration as being at line start (for heading detection) */
+  private readonly MAX_HEADING_MARKER_OFFSET = 10;
+
   private hideDecorationType = HideDecorationType();
   private boldDecorationType = BoldDecorationType();
   private italicDecorationType = ItalicDecorationType();
@@ -93,6 +102,11 @@ export class Decorator {
   private horizontalRuleDecorationType = HorizontalRuleDecorationType();
   private checkboxUncheckedDecorationType = CheckboxUncheckedDecorationType();
   private checkboxCheckedDecorationType = CheckboxCheckedDecorationType();
+
+  constructor() {
+    // Initialize configuration on construction
+    this.updateCursorConfigInternal();
+  }
 
   /**
    * Sets the active text editor and immediately updates decorations.
@@ -117,6 +131,7 @@ export class Decorator {
     }
 
     this.activeEditor = textEditor;
+    this.updateCursorConfigInternal();
 
     // Update immediately when switching editors (no debounce)
     this.updateDecorationsForSelection();
@@ -431,7 +446,128 @@ export class Decorator {
   }
 
   /**
+   * Checks if a decoration type is a heading decoration (heading1-6 or generic heading).
+   * 
+   * @private
+   * @param {DecorationType} type - The decoration type to check
+   * @returns {boolean} True if the type is a heading decoration
+   */
+  private isHeadingDecorationType(type: DecorationType): boolean {
+    return type === 'heading' || 
+      type === 'heading1' || type === 'heading2' ||
+      type === 'heading3' || type === 'heading4' ||
+      type === 'heading5' || type === 'heading6';
+  }
+
+  /**
+   * Finds all line numbers that contain heading decorations.
+   * 
+   * @private
+   * @param {DecorationRange[]} decorations - All decorations to search
+   * @param {string} originalText - Original document text (for offset adjustment)
+   * @returns {Set<number>} Set of line numbers that contain headings
+   */
+  private findHeadingLines(decorations: DecorationRange[], originalText: string): Set<number> {
+    const headingLines = new Set<number>();
+    
+    for (const decoration of decorations) {
+      if (this.isHeadingDecorationType(decoration.type)) {
+        const range = this.createRange(decoration.startPos, decoration.endPos, originalText);
+        if (range) {
+          headingLines.add(range.start.line);
+        }
+      }
+    }
+    
+    return headingLines;
+  }
+
+  /**
+   * Finds line numbers that contain headings and are within the selection.
+   * 
+   * @private
+   * @param {DecorationRange[]} decorations - All decorations to search
+   * @param {Selection} selection - The effective selection to check
+   * @param {string} originalText - Original document text (for offset adjustment)
+   * @returns {Set<number>} Set of selected line numbers that contain headings
+   */
+  private findSelectedHeadingLines(
+    decorations: DecorationRange[], 
+    selection: Selection, 
+    originalText: string
+  ): Set<number> {
+    const headingLines = this.findHeadingLines(decorations, originalText);
+    const selectedHeadingLines = new Set<number>();
+    
+    // Check if selection is on any heading lines
+    for (let line = selection.start.line; line <= selection.end.line; line++) {
+      if (headingLines.has(line)) {
+        selectedHeadingLines.add(line);
+      }
+    }
+    
+    return selectedHeadingLines;
+  }
+
+  /**
+   * Checks if a hide decoration is for a heading marker (#).
+   * 
+   * This identifies hide decorations that hide the '#' characters at the start of headings.
+   * When a heading line is selected, we want to show these markers.
+   * 
+   * @private
+   * @param {Range} range - The range of the hide decoration
+   * @param {number} lineNumber - The line number to check
+   * @returns {boolean} True if this hide decoration is for a heading marker
+   */
+  private isHeadingMarkerHideDecoration(range: Range, lineNumber: number): boolean {
+    if (!this.activeEditor) return false;
+    
+    const lineText = this.activeEditor.document.lineAt(lineNumber).text;
+    const trimmedLine = lineText.trim();
+    const isAtLineStart = range.start.character <= this.MAX_HEADING_MARKER_OFFSET;
+    
+    // Check if line starts with '#' and decoration is at the start (accounting for indentation)
+    return trimmedLine.startsWith('#') && isAtLineStart;
+  }
+
+  /**
+   * Determines if a decoration should be skipped (not applied) for a selected heading line.
+   * 
+   * When a heading line is selected:
+   * - Hide decorations for heading markers (#) should be skipped (to show the marker)
+   * - Heading font-size decorations should be skipped (to return to normal size)
+   * - Other decorations should be applied normally
+   * 
+   * @private
+   * @param {DecorationRange} decoration - The decoration to check
+   * @param {Range} range - The range of the decoration
+   * @returns {boolean} True if the decoration should be skipped
+   */
+  private shouldSkipDecorationForSelectedHeading(decoration: DecorationRange, range: Range): boolean {
+    // Show heading marker (#) by skipping the hide decoration
+    if (decoration.type === 'hide') {
+      return this.isHeadingMarkerHideDecoration(range, range.start.line);
+    }
+    
+    // Hide font-size decorations to return to normal font size
+    if (this.isHeadingDecorationType(decoration.type)) {
+      return true;
+    }
+    
+    // Keep other decorations (bold, italic, etc.) - don't skip them
+    return false;
+  }
+
+  /**
    * Filters decorations based on current selections and groups by type.
+   * 
+   * Implements intersection-based filtering:
+   * - Uses first selection only
+   * - Optionally expands selection to full lines (cursorLineDisables)
+   * - Uses intersection-based filtering (cursorDisables)
+   * - Preserves checkbox toggle functionality
+   * - Special handling for heading lines: shows # marker and hides font-size when selected
    * 
    * @private
    * @param {DecorationRange[]} decorations - Decorations to filter
@@ -443,24 +579,32 @@ export class Decorator {
       return new Map();
     }
 
-    // Pre-compute selected line ranges for O(1) lookups
-    const selectedLines = new Set<number>();
-    const selectedRanges: Range[] = [];
-    const cursorPositions: Position[] = [];
+    // Get first selection only
+    if (this.activeEditor.selections.length === 0) {
+      return new Map();
+    }
+    let effectiveSelection = this.activeEditor.selections[0];
 
+    // Expand selection to full lines if cursorLineDisables is enabled
+    if (this.cursorLineDisables) {
+      effectiveSelection = this.expandSelectionToLines(effectiveSelection);
+    }
+
+    // Get cursor positions for checkbox special handling
+    // Note: We check all selections for cursor positions (for checkbox toggle),
+    // but only use first selection for decoration filtering
+    const cursorPositions: Position[] = [];
     for (const selection of this.activeEditor.selections) {
-      // Add all lines in the selection to the set
-      for (let line = selection.start.line; line <= selection.end.line; line++) {
-        selectedLines.add(line);
-      }
-      // Store non-empty selections for precise range intersection checks
-      if (!selection.isEmpty) {
-        selectedRanges.push(selection);
-      } else {
-        // Store cursor positions for checkbox exclusion check
+      if (selection.isEmpty) {
         cursorPositions.push(selection.start);
       }
     }
+
+    // Identify selected lines that contain headings
+    // This is used to show heading markers (#) and hide font-size decorations when selected
+    const selectedHeadingLines = this.cursorDisables
+      ? this.findSelectedHeadingLines(decorations, effectiveSelection, originalText)
+      : new Set<number>();
 
     // Group decorations by type using Map
     const filtered = new Map<DecorationType, Range[]>();
@@ -490,11 +634,28 @@ export class Decorator {
           continue;
         }
       }
+
+      // Special handling for heading lines when selected:
+      // - Show the heading marker (#) by revealing the 'hide' decoration
+      // - Hide the font-size decorations (heading1-6, 'heading') to return to normal size
+      // - Keep other decorations (bold, italic, etc.) applied
+      if (selectedHeadingLines.has(range.start.line)) {
+        if (this.shouldSkipDecorationForSelectedHeading(decoration, range)) {
+          continue;
+        }
+      }
       
-      // For all decorations (including checkboxes when cursor is not on them):
-      // Hide to show raw markdown when selection overlaps or cursor is on the line
-      if (this.isRangeSelected(range, selectedRanges) || this.isLineOfRangeSelected(range, selectedLines)) {
-        continue;
+      // Apply cursorDisables filter (intersection-based check)
+      // Uses selection.intersection(range) which is bidirectional:
+      // - Returns undefined if no overlap
+      // - Returns Range if they overlap (even if cursor is at start/end boundary)
+      // This handles both empty selections (cursor) and non-empty selections
+      if (this.cursorDisables) {
+        const intersection = effectiveSelection.intersection(range);
+        if (intersection !== undefined) {
+          // Hide decoration if it intersects with selection
+          continue;
+        }
       }
 
       // Add to appropriate type array
@@ -680,6 +841,54 @@ export class Decorator {
     return (changedLength / totalLength) * 100;
   }
 
+  /**
+   * Updates cached cursor configuration values from workspace settings.
+   * 
+   * Caches configuration to avoid repeated workspace API calls during filtering.
+   * 
+   * @private
+   */
+  private updateCursorConfigInternal(): void {
+    const config = workspace.getConfiguration('mdInline');
+    this.cursorDisables = config.get<boolean>('cursorDisables', true);
+    this.cursorLineDisables = config.get<boolean>('cursorLineDisables', true);
+  }
+
+  /**
+   * Public method to update cursor configuration and refresh decorations.
+   * Called when configuration changes to update cached values and refresh the UI.
+   */
+  updateCursorConfig(): void {
+    this.updateCursorConfigInternal();
+    if (this.activeEditor) {
+      this.updateDecorationsForSelection();
+    }
+  }
+
+  /**
+   * Expands a selection to include the full lines it spans.
+   * 
+   * When cursorLineDisables is enabled, this expands the selection to full lines
+   * before applying intersection-based filtering.
+   * 
+   * @private
+   * @param {Selection} selection - The selection to expand
+   * @returns {Selection} A new selection expanded to full lines, or original selection if expansion fails
+   */
+  private expandSelectionToLines(selection: Selection): Selection {
+    if (!this.activeEditor) return selection;
+    
+    try {
+      // Use Position directly to get line information
+      const lineStart = this.activeEditor.document.lineAt(selection.start);
+      const lineEnd = this.activeEditor.document.lineAt(selection.end);
+      return new Selection(lineStart.range.start, lineEnd.range.end);
+    } catch (error) {
+      // If lineAt fails (e.g., invalid line numbers), return original selection
+      console.warn('Failed to expand selection to lines:', error);
+      return selection;
+    }
+  }
 
   /**
    * Dispose of resources and clear any pending updates.
