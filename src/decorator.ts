@@ -24,6 +24,7 @@ import {
   CheckboxUncheckedDecorationType,
   CheckboxCheckedDecorationType,
   FrontmatterDecorationType,
+  HtmlTagDecorationType,
 } from './decorations';
 import { MarkdownParser, DecorationRange, DecorationType } from './parser';
 import { mapNormalizedToOriginal } from './position-mapping';
@@ -115,6 +116,7 @@ export class Decorator {
   private checkboxUncheckedDecorationType = CheckboxUncheckedDecorationType();
   private checkboxCheckedDecorationType = CheckboxCheckedDecorationType();
   private frontmatterDecorationType = FrontmatterDecorationType();
+  private htmlTagDecorationType = HtmlTagDecorationType();
 
   /**
    * Sets the active text editor and immediately updates decorations.
@@ -649,6 +651,7 @@ export class Decorator {
     ['checkboxUnchecked', this.checkboxUncheckedDecorationType],
     ['checkboxChecked', this.checkboxCheckedDecorationType],
     ['frontmatter', this.frontmatterDecorationType],
+    ['htmlTag', this.htmlTagDecorationType],
   ]);
 
   /**

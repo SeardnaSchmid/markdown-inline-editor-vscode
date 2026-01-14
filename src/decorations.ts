@@ -339,3 +339,17 @@ export function CheckboxCheckedDecorationType() {
     },
   });
 }
+
+/**
+ * Creates a decoration type for HTML tag styling.
+ * 
+ * Styles tag markers distinctly without rendering HTML.
+ * 
+ * @returns {vscode.TextEditorDecorationType} A decoration type for HTML tags
+ */
+export function HtmlTagDecorationType() {
+  return window.createTextEditorDecorationType({
+    color: new ThemeColor('editorHint.foreground'),
+    fontStyle: 'italic',
+  });
+}

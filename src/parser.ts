@@ -1,4 +1,4 @@
-import type { Root, Node, Strong, Emphasis, Heading, InlineCode, Code, Link, Image, Delete, Blockquote, ListItem, ThematicBreak } from 'mdast';
+import type { Root, Node, Strong, Emphasis, Heading, InlineCode, Code, Link, Image, Delete, Blockquote, ListItem, ThematicBreak, Html } from 'mdast';
 import { getRemarkProcessorSync, getRemarkProcessor } from './parser-remark';
 
 /**
@@ -44,7 +44,8 @@ export type DecorationType =
   | 'checkboxUnchecked'
   | 'checkboxChecked'
   | 'horizontalRule'
-  | 'frontmatter';
+  | 'frontmatter'
+  | 'htmlTag';
 
 /**
  * Type for the unified processor used to parse markdown text to a Root AST node.
@@ -238,6 +239,10 @@ export class MarkdownParser {
 
           case 'thematicBreak':
             this.processThematicBreak(node as ThematicBreak, text, decorations);
+            break;
+          
+          case 'html':
+            this.processHtml(node as Html, text, decorations);
             break;
         }
       } catch (error) {
@@ -952,6 +957,46 @@ export class MarkdownParser {
     });
   }
 
+  /**
+   * Processes an HTML node to detect and decorate tags within it.
+   * 
+   * This styles tag markers only and leaves content untouched.
+   */
+  private processHtml(
+    node: Html,
+    text: string,
+    decorations: DecorationRange[]
+  ): void {
+    if (!this.hasValidPosition(node)) return;
+
+    const start = node.position!.start.offset!;
+    const end = node.position!.end.offset!;
+
+    if (start >= end) return;
+
+    const htmlSource = text.slice(start, end);
+    if (htmlSource.indexOf('<') === -1) {
+      return;
+    }
+
+    // Lightweight tag matcher for opening, closing, and self-closing tags.
+    // Keeps it simple to avoid full HTML parsing.
+    const tagRegex = /<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s[^<>]*?)?\/?>/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = tagRegex.exec(htmlSource)) !== null) {
+      const tagStart = start + match.index;
+      const tagEnd = tagStart + match[0].length;
+
+      if (tagStart >= start && tagEnd <= end) {
+        decorations.push({
+          startPos: tagStart,
+          endPos: tagEnd,
+          type: 'htmlTag',
+        });
+      }
+    }
+  }
 
   /**
    * Handles empty image alt text that remark doesn't parse as an Image node.

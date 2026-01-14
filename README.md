@@ -101,7 +101,7 @@ The extension currently supports **13 markdown features** with syntax hiding. Fo
 * [ ] **Column alignment in tables with markup** • [Details](docs/features/table-column-alignment.md) • [Issue #21](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/21)
 
 ### Low Priority
-* [ ] **HTML Tags** • [Details](docs/features/html-tags.md) • [Issue #29](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/29)
+* [x] **HTML Tags** • [Details](docs/features/html-tags.md) • [Issue #29](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/29)
 * [ ] **Mentions/References** • [Details](docs/features/mentions-references.md) • [Issue #25](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/25)
 * [ ] **Emoji Support** • [Details](docs/features/emoji-support.md) • [Issue #30](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/30)
 * [ ] **Ordered List Auto-Numbering** • [Details](docs/features/ordered-list-auto-numbering.md) • [Issue #31](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/31)
