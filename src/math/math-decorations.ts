@@ -37,7 +37,7 @@ type MathDecorationEntry = {
 
 /** Creates content key for caching decoration type (source + displayMode + optional numLines for height). */
 function contentKey(source: string, displayMode: boolean, numLines?: number): string {
-  if (displayMode && numLines != null) {
+  if (displayMode && numLines !== undefined && numLines !== null) {
     return `block:${numLines}:${source}`;
   }
   return `${displayMode ? 'block' : 'inline'}:${source}`;
@@ -70,7 +70,7 @@ export class MathDecorations {
     for (const { region, range } of regionsWithRanges) {
       if (!range) continue;
       const height =
-        region.displayMode && region.numLines != null
+        region.displayMode && region.numLines !== undefined && region.numLines !== null
           ? (region.numLines + 2) * lineHeight
           : region.displayMode
             ? blockHeight

@@ -65,6 +65,20 @@ export const config = {
         .get<boolean>('math.enabled', true);
     },
   },
+  mentions: {
+    /** If set, overrides GitHub context: true = force links on, false = force off. Unset = use git remote auto-detect. */
+    linksEnabled(): boolean | undefined {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('mentions.linksEnabled');
+    },
+    /** Optional: master switch to enable/disable mention and issue-reference styling and detection. */
+    enabled(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('mentions.enabled', true);
+    },
+  },
   colors: {
     heading1(): string | undefined {
       return getColorConfig('heading1');

@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { MarkdownParseCache } from './markdown-parse-cache';
 import { mapNormalizedToOriginal } from './position-mapping';
 import { shouldSkipInDiffView } from './diff-context';
-import { resolveImageTarget, resolveLinkTarget, toCommandUri } from './link-targets';
+import { resolveImageTarget, resolveLinkTarget, toCommandUri, resolveMentionTarget, resolveIssueRefTarget } from './link-targets';
+import { getGitHubContext } from './github-context';
 
 /**
  * Provides clickable links and images for markdown documents.
@@ -84,6 +85,38 @@ export class MarkdownLinkProvider implements vscode.DocumentLinkProvider {
         if (target) {
           const link = new vscode.DocumentLink(range, target);
           links.push(link);
+        }
+      }
+    }
+
+    // Mention and issue-reference links when in GitHub context (URL computed from decoration metadata)
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    const workspaceRootUri = workspaceFolder?.uri;
+    if (workspaceRootUri) {
+      const ctx = getGitHubContext(workspaceRootUri);
+      if (ctx.enabled) {
+        for (const decoration of decorations) {
+          if (decoration.type === 'mention' && decoration.slug) {
+            const target = resolveMentionTarget(decoration.slug);
+            if (target) {
+              const mappedStart = mapNormalizedToOriginal(decoration.startPos, text);
+              const mappedEnd = mapNormalizedToOriginal(decoration.endPos, text);
+              const range = new vscode.Range(document.positionAt(mappedStart), document.positionAt(mappedEnd));
+              links.push(new vscode.DocumentLink(range, target));
+            }
+          } else if (decoration.type === 'issueReference' && typeof decoration.issueNumber === 'number') {
+            const owner = decoration.ownerRepo?.split('/')[0] ?? ctx.owner;
+            const repo = decoration.ownerRepo?.split('/')[1] ?? ctx.repo;
+            if (owner && repo) {
+              const target = resolveIssueRefTarget(owner, repo, decoration.issueNumber);
+              if (target) {
+                const mappedStart = mapNormalizedToOriginal(decoration.startPos, text);
+                const mappedEnd = mapNormalizedToOriginal(decoration.endPos, text);
+                const range = new vscode.Range(document.positionAt(mappedStart), document.positionAt(mappedEnd));
+                links.push(new vscode.DocumentLink(range, target));
+              }
+            }
+          }
         }
       }
     }

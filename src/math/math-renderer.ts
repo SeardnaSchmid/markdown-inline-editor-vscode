@@ -31,18 +31,14 @@ let texToSvgImpl: ((tex: string, display: boolean, height?: number, foregroundCo
 function getTexToSvg(): (tex: string, display: boolean, height?: number, foregroundColor?: string) => string {
   if (texToSvgImpl) return texToSvgImpl;
   // Use MathJax SVG output (like Markless) so we get pure SVG, not HTML in foreignObject
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  /* eslint-disable @typescript-eslint/no-var-requires */
   const { mathjax } = require('mathjax-full/js/mathjax.js');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { TeX } = require('mathjax-full/js/input/tex.js');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { SVG } = require('mathjax-full/js/output/svg.js');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { liteAdaptor } = require('mathjax-full/js/adaptors/liteAdaptor.js');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { RegisterHTMLHandler } = require('mathjax-full/js/handlers/html.js');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { AllPackages } = require('mathjax-full/js/input/tex/AllPackages.js');
+  /* eslint-enable @typescript-eslint/no-var-requires */
 
   const adaptor = liteAdaptor();
   RegisterHTMLHandler(adaptor);

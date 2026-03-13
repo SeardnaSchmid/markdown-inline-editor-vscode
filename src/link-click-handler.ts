@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { mapNormalizedToOriginal } from './position-mapping';
-import { resolveImageTarget, resolveLinkTarget } from './link-targets';
+import { resolveImageTarget, resolveLinkTarget, resolveMentionTarget, resolveIssueRefTarget } from './link-targets';
 import { MarkdownParseCache } from './markdown-parse-cache';
+import { getGitHubContext } from './github-context';
 
 /**
  * Handles single-click navigation for markdown links and images.
@@ -72,14 +73,41 @@ export class LinkClickHandler {
     // Find if the click is on a link or image
     for (const decoration of decorations) {
       if ((decoration.type === 'link' || decoration.type === 'image') && decoration.url) {
-        // Map normalized positions to original document offsets
         const start = mapNormalizedToOriginal(decoration.startPos, text);
         const end = mapNormalizedToOriginal(decoration.endPos, text);
-
-        // Check if click is within the link/image range
         if (clickOffset >= start && clickOffset < end) {
           await this.openLink(decoration.url, decoration.type, document.uri);
-          return; // Only open the first matching link
+          return;
+        }
+      }
+    }
+
+    // Mention and issue-reference: compute URL from metadata when in GitHub context
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+    if (workspaceFolder) {
+      const ctx = getGitHubContext(workspaceFolder.uri);
+      if (ctx.enabled) {
+        for (const decoration of decorations) {
+          const start = mapNormalizedToOriginal(decoration.startPos, text);
+          const end = mapNormalizedToOriginal(decoration.endPos, text);
+          if (clickOffset < start || clickOffset >= end) continue;
+          if (decoration.type === 'mention' && decoration.slug) {
+            const target = resolveMentionTarget(decoration.slug);
+            if (target) {
+              await vscode.commands.executeCommand('vscode.open', target);
+              return;
+            }
+          } else if (decoration.type === 'issueReference' && typeof decoration.issueNumber === 'number') {
+            const owner = decoration.ownerRepo?.split('/')[0] ?? ctx.owner;
+            const repo = decoration.ownerRepo?.split('/')[1] ?? ctx.repo;
+            if (owner && repo) {
+              const target = resolveIssueRefTarget(owner, repo, decoration.issueNumber);
+              if (target) {
+                await vscode.commands.executeCommand('vscode.open', target);
+                return;
+              }
+            }
+          }
         }
       }
     }

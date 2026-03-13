@@ -19,6 +19,7 @@ import type {
 import { getRemarkProcessorSync, getRemarkProcessor } from "./parser-remark";
 import { getEmojiMap } from "./emoji-map-loader";
 import { scanMathRegions } from "./math/math-scanner";
+import { config } from "./config";
 
 /**
  * Represents a decoration range in the markdown document.
@@ -41,6 +42,9 @@ export interface DecorationRange {
     fontStyle?: string;
     textDecoration?: string;
   };
+  slug?: string; // For type 'mention': segment after @ (e.g. username, org/team). Used by link provider to resolve URL. 
+  issueNumber?: number; // For type 'issueReference': issue/PR number. Used by link provider to resolve URL.
+  ownerRepo?: string; // For type 'issueReference' when repo-scoped (@user/repo#456): the "user/repo" part.
 }
 
 /**
@@ -127,7 +131,9 @@ export type DecorationType =
   | "tablePipe"
   | "tableSeparatorPipe"
   | "tableSeparatorDash"
-  | "tableCell";
+  | "tableCell"
+  | "mention"
+  | "issueReference";
 
 /**
  * Type for the unified processor used to parse markdown text to a Root AST node.
@@ -234,6 +240,11 @@ export class MarkdownParser {
 
       // Handle edge cases: empty image alt text that remark doesn't parse as Image node
       this.handleEmptyImageAlt(normalizedText, decorations);
+
+      // GitHub-style mentions and issue references (@username, @org/team, #123, @user/repo#456)
+      if (config.mentions.enabled()) {
+        this.scanMentionAndIssueRefs(normalizedText, decorations, scopes);
+      }
 
       // Safety net: Remove any markdown formatting decorations that fall within code blocks
       // Ancestor checks in processors prevent most cases, but this catches edge cases
@@ -527,6 +538,114 @@ export class MarkdownParser {
       }
       return a.endPos - b.endPos;
     });
+  }
+
+  /**
+   * Scans normalized text for GitHub-style @mentions and #issue references.
+   * Pushes decoration ranges and scopes; excludes code blocks and email patterns.
+   */
+  private scanMentionAndIssueRefs(
+    text: string,
+    decorations: DecorationRange[],
+    scopes: ScopeRange[],
+  ): void {
+    const codeRanges = this.getCodeBlockRanges(scopes, text);
+    const inCode = (start: number, end: number) =>
+      codeRanges.some((r) => start < r.end && end > r.start);
+
+    // Match @user/repo#456 first (repo-scoped issue), then @org/team, then @username, then #123
+    const repoScopedRefRe = /@([a-zA-Z0-9][a-zA-Z0-9-]*)\/([a-zA-Z0-9][a-zA-Z0-9-]*)#(\d+)/g;
+    let m: RegExpExecArray | null;
+    while ((m = repoScopedRefRe.exec(text)) !== null) {
+      const start = m.index;
+      const end = m.index + m[0].length;
+      if (inCode(start, end)) continue;
+      if (this.looksLikeEmailAt(text, start)) continue;
+      const ownerRepo = `${m[1]}/${m[2]}`;
+      decorations.push({
+        startPos: start,
+        endPos: end,
+        type: 'issueReference',
+        issueNumber: parseInt(m[3], 10),
+        ownerRepo,
+      });
+      this.addScope(scopes, start, end, 'issueReference');
+    }
+
+    // @org/team (exactly one slash, not followed by #digits — avoid overlapping with @user/repo#456)
+    const orgTeamRe = /@([a-zA-Z0-9][a-zA-Z0-9-]*)\/([a-zA-Z0-9][a-zA-Z0-9-]*)(?!#\d)/g;
+    while ((m = orgTeamRe.exec(text)) !== null) {
+      const start = m.index;
+      const end = m.index + m[0].length;
+      if (inCode(start, end)) continue;
+      if (this.looksLikeEmailAt(text, start)) continue;
+      decorations.push({
+        startPos: start,
+        endPos: end,
+        type: 'mention',
+        slug: `${m[1]}/${m[2]}`,
+      });
+      this.addScope(scopes, start, end, 'mention');
+    }
+
+    // @username (alphanumeric and hyphen, no leading hyphen)
+    const userRe = /@([a-zA-Z0-9][a-zA-Z0-9-]*)(?![a-zA-Z0-9/-])/g;
+    while ((m = userRe.exec(text)) !== null) {
+      const start = m.index;
+      const end = m.index + m[0].length;
+      if (inCode(start, end)) continue;
+      if (this.looksLikeEmailAt(text, start)) continue;
+      decorations.push({
+        startPos: start,
+        endPos: end,
+        type: 'mention',
+        slug: m[1],
+      });
+      this.addScope(scopes, start, end, 'mention');
+    }
+
+    // #123 (digits only)
+    const issueRe = /#(\d+)/g;
+    while ((m = issueRe.exec(text)) !== null) {
+      const start = m.index;
+      const end = m.index + m[0].length;
+      if (inCode(start, end)) continue;
+      decorations.push({
+        startPos: start,
+        endPos: end,
+        type: 'issueReference',
+        issueNumber: parseInt(m[1], 10),
+      });
+      this.addScope(scopes, start, end, 'issueReference');
+    }
+  }
+
+  /** Returns whether the @ at position atIdx appears to be part of an email (local@domain). */
+  private looksLikeEmailAt(text: string, atIdx: number): boolean {
+    let lo = atIdx - 1;
+    while (lo >= 0 && /[a-zA-Z0-9._%+-]/.test(text[lo])) lo--;
+    const localPart = text.slice(lo + 1, atIdx);
+    let hi = atIdx + 1;
+    while (hi < text.length && /[a-zA-Z0-9.-]/.test(text[hi])) hi++;
+    const domainPart = text.slice(atIdx + 1, hi);
+    if (!localPart.length || !domainPart.length) return false;
+    if (!/\./.test(domainPart)) return false;
+    return true;
+  }
+
+  /** Builds code block ranges from scopes for mention/ref exclusion. */
+  private getCodeBlockRanges(
+    scopes: ScopeRange[],
+    _text: string,
+  ): Array<{ start: number; end: number }> {
+    const out: Array<{ start: number; end: number }> = [];
+    for (const scope of scopes) {
+      if (scope.kind === 'codeBlock' || scope.kind === 'code') {
+        out.push({ start: scope.startPos, end: scope.endPos });
+      }
+    }
+    out.sort((a, b) => a.start - b.start);
+    return out;
   }
 
   /**

@@ -20,6 +20,8 @@ import {
   Heading6DecorationType,
   LinkDecorationType,
   ImageDecorationType,
+  MentionDecorationType,
+  IssueReferenceDecorationType,
   BlockquoteDecorationType,
   ListItemDecorationType,
   OrderedListItemDecorationType,
@@ -78,6 +80,8 @@ export class DecorationTypeRegistry {
   private heading6DecorationType!: TextEditorDecorationType;
   private linkDecorationType!: TextEditorDecorationType;
   private imageDecorationType!: TextEditorDecorationType;
+  private mentionDecorationType!: TextEditorDecorationType;
+  private issueReferenceDecorationType!: TextEditorDecorationType;
   private blockquoteDecorationType!: TextEditorDecorationType;
   private listItemDecorationType!: TextEditorDecorationType;
   private orderedListItemDecorationType!: TextEditorDecorationType;
@@ -115,6 +119,8 @@ export class DecorationTypeRegistry {
     this.heading6DecorationType = Heading6DecorationType(this.options.getHeading6Color?.());
     this.linkDecorationType = LinkDecorationType(this.options.getLinkColor?.());
     this.imageDecorationType = ImageDecorationType(this.options.getImageColor?.());
+    this.mentionDecorationType = MentionDecorationType(this.options.getLinkColor?.());
+    this.issueReferenceDecorationType = IssueReferenceDecorationType(this.options.getLinkColor?.());
     this.blockquoteDecorationType = BlockquoteDecorationType(this.options.getBlockquoteColor?.());
     this.listItemDecorationType = ListItemDecorationType(this.options.getListMarkerColor?.());
     this.orderedListItemDecorationType = OrderedListItemDecorationType(this.options.getListMarkerColor?.());
@@ -148,6 +154,8 @@ export class DecorationTypeRegistry {
       ['heading6', this.heading6DecorationType],
       ['link', this.linkDecorationType],
       ['image', this.imageDecorationType],
+      ['mention', this.mentionDecorationType],
+      ['issueReference', this.issueReferenceDecorationType],
       ['blockquote', this.blockquoteDecorationType],
       ['listItem', this.listItemDecorationType],
       ['orderedListItem', this.orderedListItemDecorationType],
@@ -203,6 +211,8 @@ export class DecorationTypeRegistry {
     this.recreateDecorationType(this.italicDecorationType, () => ItalicDecorationType(this.options.getEmphasisColor?.()), (t) => { this.italicDecorationType = t; }, 'italic');
     this.recreateDecorationType(this.boldItalicDecorationType, () => BoldItalicDecorationType(this.options.getEmphasisColor?.()), (t) => { this.boldItalicDecorationType = t; }, 'boldItalic');
     this.recreateDecorationType(this.imageDecorationType, () => ImageDecorationType(this.options.getImageColor?.()), (t) => { this.imageDecorationType = t; }, 'image');
+    this.recreateDecorationType(this.mentionDecorationType, () => MentionDecorationType(this.options.getLinkColor?.()), (t) => { this.mentionDecorationType = t; }, 'mention');
+    this.recreateDecorationType(this.issueReferenceDecorationType, () => IssueReferenceDecorationType(this.options.getLinkColor?.()), (t) => { this.issueReferenceDecorationType = t; }, 'issueReference');
     this.recreateDecorationType(this.horizontalRuleDecorationType, () => HorizontalRuleDecorationType(this.options.getHorizontalRuleColor?.()), (t) => { this.horizontalRuleDecorationType = t; }, 'horizontalRule');
     this.recreateDecorationType(this.checkboxUncheckedDecorationType, () => CheckboxUncheckedDecorationType(this.options.getCheckboxColor?.()), (t) => { this.checkboxUncheckedDecorationType = t; }, 'checkboxUnchecked');
     this.recreateDecorationType(this.checkboxCheckedDecorationType, () => CheckboxCheckedDecorationType(this.options.getCheckboxColor?.()), (t) => { this.checkboxCheckedDecorationType = t; }, 'checkboxChecked');

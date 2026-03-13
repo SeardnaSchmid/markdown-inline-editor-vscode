@@ -198,6 +198,9 @@ export const workspace = {
       return defaultValue;
     },
   }),
+  getWorkspaceFolder: (_uri: { fsPath?: string; toString?: () => string }): { uri: { fsPath: string }; name: string } | undefined => {
+    return undefined;
+  },
 };
 
 export const ExtensionContext = class {
