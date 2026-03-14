@@ -21,14 +21,14 @@ Add GitHub-style `@username`, `@org/team`, `#123`, and `@user/repo#456` detectio
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|--------|
-| **I. Code Quality** | Pass | TypeScript strict; changes in `/src/` only; JSDoc for public APIs; `npm run validate` before commit |
-| **II. Testing Standards** | Pass | Tests in `__tests__/` next to module; cover patterns, email exclusion, context off; mock VS Code where needed |
-| **III. UX Consistency** | Pass | Mention/ref styling consistent with link styling; link handling same as existing markdown links; reveal-on-select same as existing |
-| **IV. Performance** | Pass | Mention/ref detection in same parse pass (or post-pass on cached parse); parse cache always used; no parse on selection |
+| Principle                 | Status | Notes                                                                                                                              |
+| ------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **I. Code Quality**       | Pass   | TypeScript strict; changes in `/src/` only; JSDoc for public APIs; `npm run validate` before commit                                |
+| **II. Testing Standards** | Pass   | Tests in `__tests__/` next to module; cover patterns, email exclusion, context off; mock VS Code where needed                      |
+| **III. UX Consistency**   | Pass   | Mention/ref styling consistent with link styling; link handling same as existing markdown links; reveal-on-select same as existing |
+| **IV. Performance**       | Pass   | Mention/ref detection in same parse pass (or post-pass on cached parse); parse cache always used; no parse on selection            |
 
 No violations. No complexity justification required.
 
@@ -62,12 +62,12 @@ src/
 ├── link-provider.ts             # Provide DocumentLinks for mention/ref when in context
 ├── link-click-handler.ts        # Include mention/ref in single-click when enabled
 ├── link-targets.ts              # Optional: extend or add resolveMentionTarget, resolveIssueRefTarget
-├── github-context.ts            # NEW: getGitHubContext(workspaceRootUri), GitHubContextResult, git remote + setting
-├── github-context/__tests__/    # github-context.test.ts
+├── forge-context.ts             # NEW: getForgeContext(workspaceRootUri), ForgeContextResult, git remote + setting
+├── forge-context/__tests__/     # forge-context.test.ts
 └── (existing modules unchanged except where integrating new decoration types and links)
 ```
 
-**Structure Decision**: Single-project VS Code extension. New module `github-context.ts` for context detection; parser and link-provider/click-handler extended in place; new decoration types in decorations.ts and registry.
+**Structure Decision**: Single-project VS Code extension. New module `forge-context.ts` for context detection; parser and link-provider/click-handler extended in place; new decoration types in decorations.ts and registry.
 
 ## Complexity Tracking
 

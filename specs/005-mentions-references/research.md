@@ -55,8 +55,8 @@
 
 ## 6. Integration with existing link provider and click handler
 
-**Decision**: Parser emits `mention` and `issueReference` decorations with metadata (e.g. slug, issue number, ownerRepo for repo-scoped refs) but does not set `decoration.url`. The link provider calls `getGitHubContext` for the document workspace and, when enabled, computes the URL from that metadata and the resolve functions, then supplies it as the DocumentLink target. When not in context, no DocumentLink is provided (styled text only—accessibility: link when clickable, text when not).
+**Decision**: Parser emits `mention` and `issueReference` decorations with metadata (e.g. slug, issue number, ownerRepo for repo-scoped refs) but does not set `decoration.url`. The link provider calls `getForgeContext` for the document workspace and, when enabled, computes the URL from that metadata and the resolve functions, then supplies it as the DocumentLink target. When not in context, no DocumentLink is provided (styled text only—accessibility: link when clickable, text when not).
 
-**Rationale**: Parser stays synchronous; context and URL resolution happen in the link provider, which already has access to the document and can call async `getGitHubContext` when building links. Spec FR-006 and FR-011: same interaction as other links; expose as link when clickable, as text when not.
+**Rationale**: Parser stays synchronous; context and URL resolution happen in the link provider, which already has access to the document and can call async `getForgeContext` when building links. Spec FR-006 and FR-011: same interaction as other links; expose as link when clickable, as text when not.
 
 **Alternatives considered**: Separate provider for mention/ref links—rejected to keep one place for “clickable in editor” and same UX as links.

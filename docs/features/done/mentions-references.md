@@ -14,18 +14,18 @@ Inline styling and optional linking for GitHub-style `@username`, `@org/team`, `
 
 - Parser: post-pass in `src/parser.ts` (`scanMentionAndIssueRefs`) after AST processing; excludes code blocks and email patterns; emits `mention` and `issueReference` decorations with `slug`, `issueNumber`, `ownerRepo` metadata.
 - URL resolution: `src/link-targets.ts` — `resolveMentionTarget(slug)`, `resolveIssueRefTarget(owner, repo, number)`.
-- Context: `src/github-context.ts` — `getGitHubContext(workspaceRootUri)`.
+- Context: `src/forge-context.ts` — `getForgeContext(workspaceRootUri)`.
 - Styling: `src/decorations.ts` (MentionDecorationType, IssueReferenceDecorationType), `src/decorator/decoration-type-registry.ts`.
 - Links: `src/link-provider.ts`, `src/link-click-handler.ts` use decoration metadata and GitHub context to provide DocumentLinks and open on click.
 
 ### Patterns
 
-| Pattern           | Example           | Styled as        | Click target (when in GitHub context)   |
-|------------------|-------------------|------------------|-----------------------------------------|
-| User mention      | `@username`       | Link-like        | `https://github.com/username`           |
-| Org/team mention | `@org/team`       | Link-like        | `https://github.com/org/team`           |
-| Issue reference   | `#123`            | Link-like        | `https://github.com/owner/repo/issues/123` |
-| Repo-scoped issue | `@user/repo#456`  | Link-like        | `https://github.com/user/repo/issues/456` |
+| Pattern           | Example          | Styled as | Click target (when in GitHub context)      |
+| ----------------- | ---------------- | --------- | ------------------------------------------ |
+| User mention      | `@username`      | Link-like | `https://github.com/username`              |
+| Org/team mention  | `@org/team`      | Link-like | `https://github.com/org/team`              |
+| Issue reference   | `#123`           | Link-like | `https://github.com/owner/repo/issues/123` |
+| Repo-scoped issue | `@user/repo#456` | Link-like | `https://github.com/user/repo/issues/456`  |
 
 Segment rules: alphanumeric and hyphen only; no leading hyphen. Underscore not allowed. Exclusions: code blocks, inline code, email-like patterns. Reveal on select: selection shows raw `@user` / `#123`.
 
@@ -36,7 +36,7 @@ Segment rules: alphanumeric and hyphen only; no leading hyphen. Underscore not a
 
 ### Context behavior
 
-GitHub context from `getGitHubContext(workspaceRootUri)`; link provider and click handler only provide/open URLs when context is enabled.
+Forge context from `getForgeContext(workspaceRootUri)`; link provider and click handler only provide/open URLs when context is enabled.
 
 ## Acceptance Criteria
 
@@ -49,7 +49,7 @@ GitHub context from `getGitHubContext(workspaceRootUri)`; link provider and clic
 ## Notes
 
 - Feature 005; spec and plan in `specs/005-mentions-references/`.
-- Tests: `src/parser/__tests__/parser-mention-ref.test.ts`, `src/github-context/__tests__/github-context.test.ts`.
+- Tests: `src/parser/__tests__/parser-mention-ref.test.ts`, `src/forge-context/__tests__/forge-context.test.ts`.
 
 ## Examples
 

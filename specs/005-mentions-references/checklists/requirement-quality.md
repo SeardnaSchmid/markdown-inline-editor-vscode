@@ -63,7 +63,7 @@
 ## Ambiguities & Conflicts
 
 - [x] CHK031 Is “optional target URL when in a resolving context” (Key Entities) aligned with “URL computed at link-provider time” in plan/research? [Consistency, Spec §Key Entities, plan/research]
-- [x] CHK032 Are there any conflicting definitions of “in context” (spec vs plan vs contracts)? [Conflict, Spec §FR-006, contracts/github-context-api.md]
+- [x] CHK032 Are there any conflicting definitions of “in context” (spec vs plan vs contracts)? [Conflict, Spec §FR-006, contracts/forge-context-api.md]
 - [x] CHK033 Is “representative samples” / “representative test data” (SC-003, SC-005) defined or left intentionally flexible? [Ambiguity, Spec §SC-003, SC-005]
 
 ## Notes

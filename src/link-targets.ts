@@ -1,24 +1,27 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 export type LinkTarget =
-  | { kind: 'command'; command: string; args: unknown[] }
-  | { kind: 'uri'; uri: vscode.Uri };
+  | { kind: "command"; command: string; args: unknown[] }
+  | { kind: "uri"; uri: vscode.Uri };
 
-export function resolveImageTarget(url: string, documentUri: vscode.Uri): vscode.Uri | undefined {
+export function resolveImageTarget(
+  url: string,
+  documentUri: vscode.Uri,
+): vscode.Uri | undefined {
   const trimmed = url.trim();
   if (!trimmed) {
     return;
   }
 
-  if (trimmed.startsWith('/')) {
+  if (trimmed.startsWith("/")) {
     return vscode.Uri.file(trimmed);
   }
 
   if (
-    trimmed.startsWith('http://') ||
-    trimmed.startsWith('https://') ||
-    trimmed.startsWith('data:') ||
-    trimmed.startsWith('file:')
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("file:")
   ) {
     try {
       return vscode.Uri.parse(trimmed);
@@ -27,76 +30,100 @@ export function resolveImageTarget(url: string, documentUri: vscode.Uri): vscode
     }
   }
 
-  return vscode.Uri.joinPath(documentUri, '..', trimmed);
+  return vscode.Uri.joinPath(documentUri, "..", trimmed);
 }
 
-export function resolveLinkTarget(url: string, documentUri: vscode.Uri): LinkTarget | undefined {
+export function resolveLinkTarget(
+  url: string,
+  documentUri: vscode.Uri,
+): LinkTarget | undefined {
   const trimmed = url.trim();
   if (!trimmed) {
     return;
   }
 
-  if (trimmed.startsWith('#')) {
+  if (trimmed.startsWith("#")) {
     const anchor = trimmed.substring(1);
-    return { kind: 'command', command: 'markdown-inline-editor.navigateToAnchor', args: [anchor, documentUri.toString()] };
+    return {
+      kind: "command",
+      command: "markdown-inline-editor.navigateToAnchor",
+      args: [anchor, documentUri.toString()],
+    };
   }
 
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('mailto:')) {
-    return { kind: 'uri', uri: vscode.Uri.parse(trimmed) };
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("mailto:")
+  ) {
+    return { kind: "uri", uri: vscode.Uri.parse(trimmed) };
   }
 
-  if (trimmed.startsWith('file:')) {
+  if (trimmed.startsWith("file:")) {
     try {
-      return { kind: 'uri', uri: vscode.Uri.parse(trimmed) };
+      return { kind: "uri", uri: vscode.Uri.parse(trimmed) };
     } catch {
       return;
     }
   }
 
-  if (trimmed.startsWith('/')) {
-    return { kind: 'uri', uri: vscode.Uri.file(trimmed) };
+  if (trimmed.startsWith("/")) {
+    return { kind: "uri", uri: vscode.Uri.file(trimmed) };
   }
 
-  return { kind: 'uri', uri: vscode.Uri.joinPath(documentUri, '..', trimmed) };
+  return { kind: "uri", uri: vscode.Uri.joinPath(documentUri, "..", trimmed) };
 }
 
 export function toCommandUri(command: string, args: unknown[]): vscode.Uri {
-  return vscode.Uri.parse(`command:${command}?${encodeURIComponent(JSON.stringify(args))}`);
+  return vscode.Uri.parse(
+    `command:${command}?${encodeURIComponent(JSON.stringify(args))}`,
+  );
 }
 
-const GITHUB_BASE = 'https://github.com';
+const DEFAULT_WEB_BASE = "https://github.com";
 
 /**
- * Resolves a mention slug (@username or @org/team) to a GitHub profile or team URL.
+ * Resolves a mention slug (@username or @org/team) to a forge profile or team URL.
  *
  * @param slug - The segment after @ (e.g. "alice", "org/team")
- * @returns URI for the GitHub profile or team page, or undefined if invalid
+ * @param webBaseUrl - Optional forge web base URL (e.g. https://gitlab.com)
+ * @returns URI for the profile or team page, or undefined if invalid
  */
-export function resolveMentionTarget(slug: string): vscode.Uri | undefined {
+export function resolveMentionTarget(
+  slug: string,
+  webBaseUrl: string = DEFAULT_WEB_BASE,
+): vscode.Uri | undefined {
   const trimmed = slug.trim();
   if (!trimmed) {
     return undefined;
   }
-  return vscode.Uri.parse(`${GITHUB_BASE}/${trimmed}`);
+  const base = webBaseUrl.replace(/\/+$/, "");
+  return vscode.Uri.parse(`${base}/${trimmed}`);
 }
 
 /**
- * Resolves an issue reference to a GitHub issues URL.
+ * Resolves an issue reference to a forge issue URL.
  *
  * @param owner - Repository owner (from git remote or @user/repo)
  * @param repo - Repository name
  * @param number - Issue or PR number
- * @returns URI for the GitHub issue, or undefined if any part is missing
+ * @param webBaseUrl - Optional forge web base URL (e.g. https://gitlab.com)
+ * @param issuePathSegment - Optional forge issue path segment (e.g. issues, -/issues)
+ * @returns URI for the issue, or undefined if any part is missing
  */
 export function resolveIssueRefTarget(
   owner: string,
   repo: string,
-  number: number
+  number: number,
+  webBaseUrl: string = DEFAULT_WEB_BASE,
+  issuePathSegment: string = "issues",
 ): vscode.Uri | undefined {
   const o = owner?.trim();
   const r = repo?.trim();
   if (!o || !r || number === null || number === undefined || number < 1) {
     return undefined;
   }
-  return vscode.Uri.parse(`${GITHUB_BASE}/${o}/${r}/issues/${number}`);
+  const base = webBaseUrl.replace(/\/+$/, "");
+  const issuePath = issuePathSegment.replace(/^\/+|\/+$/g, "");
+  return vscode.Uri.parse(`${base}/${o}/${r}/${issuePath}/${number}`);
 }

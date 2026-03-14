@@ -86,7 +86,6 @@ describe("forge-context", () => {
     it("returns enabled: true when linksEnabled is not set (even without a git remote)", () => {
       mockLinksEnabled.mockReturnValue(undefined);
       const result = getForgeContext(workspaceUri as any);
-      // enabled=true so @user and @org/team are always clickable
       expect(result.enabled).toBe(true);
     });
 

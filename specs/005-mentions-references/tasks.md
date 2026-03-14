@@ -35,8 +35,8 @@
 
 **⚠️ CRITICAL**: No user story implementation can begin until this phase is complete.
 
-- [x] T003 Implement `getGitHubContext(workspaceRootUri)` and `GitHubContextResult` in `src/github-context.ts` per contracts/github-context-api.md (git remote + setting override)
-- [x] T004 [P] Add tests for GitHub context (enabled/disabled, override, owner/repo parsing) in `src/github-context/__tests__/github-context.test.ts`
+- [x] T003 Implement `getForgeContext(workspaceRootUri)` and `ForgeContextResult` in `src/forge-context.ts` per contracts/forge-context-api.md (git remote + setting override)
+- [x] T004 [P] Add tests for forge context (enabled/disabled, override, owner/repo parsing) in `src/forge-context/__tests__/forge-context.test.ts`
 - [x] T005 Add `resolveMentionTarget(slug)` and `resolveIssueRefTarget(owner, repo, number)` (or extend `resolveLinkTarget`) for GitHub URLs in `src/link-targets.ts` (or new module used by link-provider)
 
 **Checkpoint**: Context and URL resolution ready; parser and link integration can start.
@@ -55,9 +55,9 @@
 - [x] T007 [US1] Implement post-pass (or scan) in `src/parser.ts` to detect `@username` (alphanumeric + hyphen, no leading hyphen) and `#digits`; exclude matches inside code blocks/inline code; exclude email patterns per contracts/mention-issue-patterns.md; push decoration ranges and scopes for reveal
 - [x] T008 [P] [US1] Add `MentionDecorationType` and `IssueReferenceDecorationType` (link-like styling) in `src/decorations.ts`
 - [x] T009 [US1] Register `mention` and `issueReference` in `src/decorator/decoration-type-registry.ts` and apply in decorator pipeline
-- [x] T010 [US1] In `src/link-provider.ts` (and click handler if needed), when providing DocumentLinks for mention/issueReference decorations: call `getGitHubContext` for the document workspace; when enabled, compute URL via resolve functions and supply as link target (URL is computed at link-provider time, not stored on decoration by parser)
+- [x] T010 [US1] In `src/link-provider.ts` (and click handler if needed), when providing DocumentLinks for mention/issueReference decorations: call `getForgeContext` for the document workspace; when enabled, compute URL via resolve functions and supply as link target (URL is computed at link-provider time, not stored on decoration by parser)
 - [x] T011 [US1] Extend `provideDocumentLinks` in `src/link-provider.ts` to include mention and issueReference decorations: when in GitHub context compute URL from decoration metadata (slug, number, ownerRepo) and create DocumentLinks; when not in context omit links (styled text only)
-- [x] T012 [US1] Extend click handling in `src/link-click-handler.ts` to open URL for mention and issueReference decorations when in GitHub context (compute URL from decoration metadata + getGitHubContext, same as link-provider)
+- [x] T012 [US1] Extend click handling in `src/link-click-handler.ts` to open URL for mention and issueReference decorations when in forge context (compute URL from decoration metadata + getForgeContext, same as link-provider)
 - [x] T013 [P] [US1] Add parser tests for mention and issue-ref patterns, email exclusion, and code-block exclusion in `src/parser/__tests__/parser-mention-ref.test.ts`; include a large-file case (e.g. >10k lines) for mention/ref scan per constitution IV
 
 **Checkpoint**: User Story 1 is complete; `@username` and `#123` are styled and clickable in context; tests pass.

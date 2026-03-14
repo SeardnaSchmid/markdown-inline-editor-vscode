@@ -124,6 +124,18 @@
           "description": "Render LaTeX math inline ($...$ and $$...$$)",
           "markdownDescription": "Render LaTeX math inline ($...$ and $$...$$). When disabled, math delimiters are shown as plain text."
         },
+        "markdownInlineEditor.mentions.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable GitHub-style mentions and issue reference styling",
+          "markdownDescription": "Enable detection and inline styling for GitHub-style mentions and references such as @username, @org/team, #123, and @owner/repo#456."
+        },
+        "markdownInlineEditor.mentions.linksEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Override clickable mention and issue reference links",
+          "markdownDescription": "Override git-remote context auto-detection for clickable mention and issue links. True forces links on, false forces links off, and unset uses origin remote auto-detection."
+        },
         "markdownInlineEditor.colors.heading1": {
           "type": "string",
           "description": "Hex color for level-1 headings",

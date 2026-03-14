@@ -47,7 +47,7 @@ npm test -- --testPathPattern="mention|github-context|parser"
 | Area     | File(s)                                                                                      |
 | -------- | -------------------------------------------------------------------------------------------- |
 | Patterns | `src/parser.ts` (post-pass or processText), `parser/__tests__/parser-mention-ref.test.ts`    |
-| Context  | `src/github-context.ts`, `src/github-context/__tests__/github-context.test.ts`               |
+| Context  | `src/forge-context.ts`, `src/forge-context/__tests__/forge-context.test.ts`                  |
 | Styling  | `src/decorations.ts`, `src/decorator/decoration-type-registry.ts`                            |
 | Links    | `src/link-provider.ts`, `src/link-click-handler.ts`, `src/link-targets.ts` (or new resolver) |
 | Config   | `src/config.ts`                                                                              |
