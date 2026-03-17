@@ -156,4 +156,62 @@ describe('MarkdownParser - Tables', () => {
       expect(cells.length).toBeGreaterThanOrEqual(2);
     });
   });
+
+  describe('outer-pipe-less tables', () => {
+    it('should render cells when table has no outer pipes', () => {
+      const md = 'A | B\n---|---\n1 | 2';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      expect(cells.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('should render separator for outer-pipe-less table', () => {
+      const md = 'A | B\n---|---\n1 | 2';
+      const result = parser.extractDecorations(md);
+      const sepDashes = byType(result, 'tableSeparatorDash');
+      expect(sepDashes.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should not create pipe decorations for virtual boundary positions', () => {
+      const md = 'A | B\n---|---\n1 | 2';
+      const result = parser.extractDecorations(md);
+      const pipes = byType(result, 'tablePipe');
+      // Virtual boundaries should not be decorated; all real pipes get │
+      pipes.forEach((p) => {
+        expect(p.replacement).toBe('\u2502');
+      });
+    });
+  });
+
+  describe('snake_case and literal character preservation', () => {
+    it('should not strip underscores from snake_case cell content', () => {
+      const md = '| Field |\n|-------|\n| snake_case |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const snakeCell = cells.find((c) => c.replacement!.includes('snake_case'));
+      expect(snakeCell).toBeDefined();
+    });
+
+    it('should not strip asterisks from arithmetic expressions', () => {
+      const md = '| Expr |\n|------|\n| 100*200 |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const exprCell = cells.find((c) => c.replacement!.includes('100'));
+      expect(exprCell).toBeDefined();
+    });
+  });
+
+  describe('mixed formatting fallback', () => {
+    it('should show raw syntax for mixed formatting cells', () => {
+      const md = '| A |\n|---|\n| **bold** and plain |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const mixedCell = cells.find((c) => c.replacement!.includes('bold'));
+      expect(mixedCell).toBeDefined();
+      // Mixed formatting should show raw markdown syntax
+      expect(mixedCell!.replacement).toContain('**');
+      // Should NOT have cellStyle since it's mixed
+      expect(mixedCell!.cellStyle).toBeUndefined();
+    });
+  });
 });
