@@ -278,35 +278,43 @@ const HEADING_CONFIG = [
  * Creates a heading decoration type with the specified level.
  *
  * @param {number} level - Heading level (1-6)
- * @param {string | ThemeColor | undefined} color - Optional hex or theme color; when undefined uses editor.foreground
+ * @param {string | ThemeColor | undefined} color - Optional hex or theme color. When **undefined** (empty extension setting = theme default), the decoration **omits** `color` so the editor keeps syntax-highlighted markdown heading colors for the active theme. When set, that color overrides the token foreground for the decorated range.
  * @returns {vscode.TextEditorDecorationType} A decoration type for the heading level
  */
 function createHeadingDecoration(level: number, color?: string | ThemeColor) {
   const config = HEADING_CONFIG[level - 1];
   if (!config) throw new Error(`Invalid heading level: ${level}`);
-  const resolvedColor = color ?? new ThemeColor('editor.foreground');
-  return window.createTextEditorDecorationType({
-    color: resolvedColor,
+  const options: Record<string, unknown> = {
     textDecoration: `none; font-size: ${config.size};`,
     ...(config.bold ? { fontWeight: 'bold' } : {}),
-  });
+  };
+  if (color !== undefined) {
+    options.color = color;
+  }
+  return window.createTextEditorDecorationType(options);
 }
 
+/** @param color - When undefined (empty setting), omit `color` so theme markdown heading syntax colors apply. */
 export function Heading1DecorationType(color?: string | ThemeColor) {
   return createHeadingDecoration(1, color);
 }
+/** @param color - When undefined (empty setting), omit `color` so theme markdown heading syntax colors apply. */
 export function Heading2DecorationType(color?: string | ThemeColor) {
   return createHeadingDecoration(2, color);
 }
+/** @param color - When undefined (empty setting), omit `color` so theme markdown heading syntax colors apply. */
 export function Heading3DecorationType(color?: string | ThemeColor) {
   return createHeadingDecoration(3, color);
 }
+/** @param color - When undefined (empty setting), omit `color` so theme markdown heading syntax colors apply. */
 export function Heading4DecorationType(color?: string | ThemeColor) {
   return createHeadingDecoration(4, color);
 }
+/** @param color - When undefined (empty setting), omit `color` so theme markdown heading syntax colors apply. */
 export function Heading5DecorationType(color?: string | ThemeColor) {
   return createHeadingDecoration(5, color);
 }
+/** @param color - When undefined (empty setting), omit `color` so theme markdown heading syntax colors apply. */
 export function Heading6DecorationType(color?: string | ThemeColor) {
   return createHeadingDecoration(6, color);
 }

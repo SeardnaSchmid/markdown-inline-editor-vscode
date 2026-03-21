@@ -177,8 +177,24 @@ export enum ColorThemeKind {
   HighContrastLight = 4,
 }
 
+/** Last options passed to `createTextEditorDecorationType` (for tests that need to assert omit-`color` behavior). */
+let lastTextEditorDecorationTypeOptions: unknown;
+
+/** @internal test helper */
+export function getLastTextEditorDecorationTypeOptions(): unknown {
+  return lastTextEditorDecorationTypeOptions;
+}
+
+/** @internal test helper */
+export function resetTextEditorDecorationTypeOptionsCapture(): void {
+  lastTextEditorDecorationTypeOptions = undefined;
+}
+
 export const window = {
-  createTextEditorDecorationType: (_options: any) => ({}),
+  createTextEditorDecorationType: (options: unknown) => {
+    lastTextEditorDecorationTypeOptions = options;
+    return {};
+  },
   activeTextEditor: undefined as any,
   visibleTextEditors: [] as any[],
   activeColorTheme: {

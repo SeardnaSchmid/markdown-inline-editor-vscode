@@ -1,6 +1,6 @@
 ---
 status: DONE
-updateDate: 2026-03-20
+updateDate: 2026-03-21
 priority: Enhancement
 ---
 
@@ -8,7 +8,7 @@ priority: Enhancement
 
 ## Overview
 
-Optional hex color overrides for headings and other inline Markdown syntax. When a setting is unset or invalid, the extension uses theme-derived defaults (e.g. `editor.foreground`, `textLink.foreground`).
+Optional hex color overrides for headings and other inline Markdown syntax. When a setting is unset or invalid, the extension falls back to theme-appropriate behavior: **headings** omit a custom `color` on decorations so the editor’s markdown heading syntax colors apply (same idea as raw markdown in the editor); other categories use workbench theme colors where documented (e.g. `textLink.foreground` for links).
 
 ## Implementation
 
@@ -29,7 +29,7 @@ Feature: Customizable syntax colors
 
   Scenario: Unset uses theme default
     When "markdownInlineEditor.colors.heading1" is unset
-    Then headings use editor.foreground from the theme
+    Then heading text uses the theme’s markdown heading colors (syntax highlighting), not a forced editor-wide foreground override
 
   Scenario: Invalid hex falls back to theme
     When I set "markdownInlineEditor.colors.link" to "not-a-color"
@@ -49,7 +49,7 @@ Feature: Customizable syntax colors
 ## Notes
 
 - Delivers US3 (discoverable settings) via schema and descriptions in Settings UI.
-- Invalid hex is validated in config getters (regex); decorations receive `undefined` and use ThemeColor.
+- Invalid hex is validated in config getters (regex); decorations receive `undefined`. For **headings**, `undefined` means no `color` on the decoration (theme markdown tokens); for other categories, factories use the documented `ThemeColor` fallbacks where applicable.
 - All 15 options are optional; theme-derived defaults per data-model.md.
 - `inlineCodeBackground` uses a semi-transparent overlay that composites over the editor background; when unset, uses theme-aware default (white overlay for dark themes, black overlay for light themes).
 

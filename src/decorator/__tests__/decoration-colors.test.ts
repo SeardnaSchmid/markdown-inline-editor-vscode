@@ -1,7 +1,15 @@
-import { ThemeColor } from '../../test/__mocks__/vscode';
+import {
+  ThemeColor,
+  getLastTextEditorDecorationTypeOptions,
+  resetTextEditorDecorationTypeOptionsCapture,
+} from '../../test/__mocks__/vscode';
 import {
   Heading1DecorationType,
   Heading2DecorationType,
+  Heading3DecorationType,
+  Heading4DecorationType,
+  Heading5DecorationType,
+  Heading6DecorationType,
   LinkDecorationType,
   BlockquoteDecorationType,
   ListItemDecorationType,
@@ -18,20 +26,30 @@ import {
 
 describe('decoration creation with color (hex vs theme)', () => {
   describe('heading decorations (US1)', () => {
+    beforeEach(() => {
+      resetTextEditorDecorationTypeOptionsCapture();
+    });
+
     it('creates heading decoration with hex color', () => {
       const dt = Heading1DecorationType('#e06c75');
       expect(dt).toBeDefined();
       expect(typeof dt).toBe('object');
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.color).toBe('#e06c75');
     });
 
-    it('creates heading decoration with ThemeColor (theme-derived fallback)', () => {
-      const dt = Heading1DecorationType(new ThemeColor('editor.foreground'));
-      expect(dt).toBeDefined();
+    it('creates heading decoration with explicit ThemeColor', () => {
+      Heading1DecorationType(new ThemeColor('editor.foreground'));
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.color).toBeInstanceOf(ThemeColor);
+      expect((opts.color as InstanceType<typeof ThemeColor>).id).toBe('editor.foreground');
     });
 
-    it('creates heading decoration with undefined (theme fallback)', () => {
-      const dt = Heading1DecorationType();
-      expect(dt).toBeDefined();
+    it('omits color when undefined so theme markdown heading tokens apply (empty setting / inherit)', () => {
+      Heading1DecorationType();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts).toBeDefined();
+      expect('color' in opts).toBe(false);
     });
 
     it('all heading levels accept optional color', () => {
@@ -41,7 +59,34 @@ describe('decoration creation with color (hex vs theme)', () => {
     });
   });
 
-  describe('syntax decorations (US2)', () => {
+  describe('heading levels H1–H6 theme default (US2)', () => {
+    beforeEach(() => {
+      resetTextEditorDecorationTypeOptionsCapture();
+    });
+
+    const headingFactories = [
+      Heading1DecorationType,
+      Heading2DecorationType,
+      Heading3DecorationType,
+      Heading4DecorationType,
+      Heading5DecorationType,
+      Heading6DecorationType,
+    ] as const;
+
+    it.each(headingFactories)('omits color when no args for each heading factory', (factory) => {
+      factory();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect('color' in opts).toBe(false);
+    });
+
+    it.each(headingFactories)('sets color when hex provided for each heading factory', (factory) => {
+      factory('#0abcff');
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.color).toBe('#0abcff');
+    });
+  });
+
+  describe('syntax decorations (non-heading)', () => {
     it('creates link decoration with hex and without', () => {
       expect(LinkDecorationType('#61afef')).toBeDefined();
       expect(LinkDecorationType()).toBeDefined();

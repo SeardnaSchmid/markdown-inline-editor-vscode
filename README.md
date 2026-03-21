@@ -142,7 +142,7 @@ Everything works out of the box. If you want to tune the experience, open Settin
 - **Emoji shortcodes** (`emojis.enabled`, default `true`)
   - Disable if you prefer seeing `:shortcode:` text.
 - **Syntax colors** (`colors.heading1` … `colors.checkbox`, 15 options including `inlineCodeBackground`)
-  - Optional hex overrides (e.g. `#e06c75`) for headings, links, list markers, inline code, inline code background, emphasis, blockquote, image, horizontal rule, checkbox. Unset or invalid values use theme-derived defaults. See [Customizable Syntax Colors][feat-customizable-syntax-colors].
+  - Optional hex overrides (e.g. `#e06c75`) for headings, links, list markers, inline code, inline code background, emphasis, blockquote, image, horizontal rule, checkbox. Unset or invalid values use theme-derived defaults (for headings, unset keeps the editor’s markdown heading syntax colors rather than forcing a single foreground). See [Customizable Syntax Colors][feat-customizable-syntax-colors].
 
 ### Example `settings.json`
 
