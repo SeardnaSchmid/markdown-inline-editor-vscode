@@ -82,6 +82,10 @@ export function toCommandUri(command: string, args: unknown[]): vscode.Uri {
 
 const DEFAULT_WEB_BASE = "https://github.com";
 
+function normalizeBase(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
 /**
  * Resolves a mention slug (@username or @org/team) to a forge profile or team URL.
  *
@@ -97,8 +101,7 @@ export function resolveMentionTarget(
   if (!trimmed) {
     return undefined;
   }
-  const base = webBaseUrl.replace(/\/+$/, "");
-  return vscode.Uri.parse(`${base}/${trimmed}`);
+  return vscode.Uri.parse(`${normalizeBase(webBaseUrl)}/${trimmed}`);
 }
 
 /**
@@ -123,7 +126,6 @@ export function resolveIssueRefTarget(
   if (!o || !r || number === null || number === undefined || number < 1) {
     return undefined;
   }
-  const base = webBaseUrl.replace(/\/+$/, "");
   const issuePath = issuePathSegment.replace(/^\/+|\/+$/g, "");
-  return vscode.Uri.parse(`${base}/${o}/${r}/${issuePath}/${number}`);
+  return vscode.Uri.parse(`${normalizeBase(webBaseUrl)}/${o}/${r}/${issuePath}/${number}`);
 }

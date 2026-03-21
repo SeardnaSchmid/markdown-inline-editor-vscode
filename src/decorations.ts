@@ -370,16 +370,12 @@ export function MentionDecorationType(color?: string | ThemeColor) {
 
 /**
  * Creates a decoration type for GitHub-style #issue reference styling (link-like).
+ * Uses the same appearance as MentionDecorationType.
  *
  * @param color - Optional hex or theme color; when undefined uses textLink.foreground
  */
 export function IssueReferenceDecorationType(color?: string | ThemeColor) {
-  const resolvedColor = color ?? new ThemeColor('textLink.foreground');
-  return window.createTextEditorDecorationType({
-    color: resolvedColor,
-    textDecoration: 'underline',
-    cursor: 'pointer',
-  });
+  return MentionDecorationType(color);
 }
 
 /**

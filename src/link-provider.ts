@@ -103,59 +103,42 @@ export class MarkdownLinkProvider implements vscode.DocumentLinkProvider {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     const rootUri =
       workspaceFolder?.uri ?? vscode.Uri.joinPath(document.uri, "..");
-    {
-      const ctx = getForgeContext(rootUri);
-      if (ctx.enabled) {
-        for (const decoration of decorations) {
-          if (decoration.type === "mention" && decoration.slug) {
-            const target = resolveMentionTarget(
-              decoration.slug,
+    const ctx = getForgeContext(rootUri);
+    if (ctx.enabled) {
+      for (const decoration of decorations) {
+        if (decoration.type === "mention" && decoration.slug) {
+          const target = resolveMentionTarget(decoration.slug, ctx.webBaseUrl);
+          if (target) {
+            const mappedStart = mapNormalizedToOriginal(decoration.startPos, text);
+            const mappedEnd = mapNormalizedToOriginal(decoration.endPos, text);
+            const range = new vscode.Range(
+              document.positionAt(mappedStart),
+              document.positionAt(mappedEnd),
+            );
+            links.push(new vscode.DocumentLink(range, target));
+          }
+        } else if (
+          decoration.type === "issueReference" &&
+          typeof decoration.issueNumber === "number"
+        ) {
+          const owner = decoration.ownerRepo?.split("/")[0] ?? ctx.owner;
+          const repo = decoration.ownerRepo?.split("/")[1] ?? ctx.repo;
+          if (owner && repo) {
+            const target = resolveIssueRefTarget(
+              owner,
+              repo,
+              decoration.issueNumber,
               ctx.webBaseUrl,
+              ctx.issuePathSegment,
             );
             if (target) {
-              const mappedStart = mapNormalizedToOriginal(
-                decoration.startPos,
-                text,
-              );
-              const mappedEnd = mapNormalizedToOriginal(
-                decoration.endPos,
-                text,
-              );
+              const mappedStart = mapNormalizedToOriginal(decoration.startPos, text);
+              const mappedEnd = mapNormalizedToOriginal(decoration.endPos, text);
               const range = new vscode.Range(
                 document.positionAt(mappedStart),
                 document.positionAt(mappedEnd),
               );
               links.push(new vscode.DocumentLink(range, target));
-            }
-          } else if (
-            decoration.type === "issueReference" &&
-            typeof decoration.issueNumber === "number"
-          ) {
-            const owner = decoration.ownerRepo?.split("/")[0] ?? ctx.owner;
-            const repo = decoration.ownerRepo?.split("/")[1] ?? ctx.repo;
-            if (owner && repo) {
-              const target = resolveIssueRefTarget(
-                owner,
-                repo,
-                decoration.issueNumber,
-                ctx.webBaseUrl,
-                ctx.issuePathSegment,
-              );
-              if (target) {
-                const mappedStart = mapNormalizedToOriginal(
-                  decoration.startPos,
-                  text,
-                );
-                const mappedEnd = mapNormalizedToOriginal(
-                  decoration.endPos,
-                  text,
-                );
-                const range = new vscode.Range(
-                  document.positionAt(mappedStart),
-                  document.positionAt(mappedEnd),
-                );
-                links.push(new vscode.DocumentLink(range, target));
-              }
             }
           }
         }

@@ -102,40 +102,35 @@ export class LinkClickHandler {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     const rootUri =
       workspaceFolder?.uri ?? vscode.Uri.joinPath(document.uri, "..");
-    {
-      const ctx = getForgeContext(rootUri);
-      if (ctx.enabled) {
-        for (const decoration of decorations) {
-          const start = mapNormalizedToOriginal(decoration.startPos, text);
-          const end = mapNormalizedToOriginal(decoration.endPos, text);
-          if (clickOffset < start || clickOffset >= end) continue;
-          if (decoration.type === "mention" && decoration.slug) {
-            const target = resolveMentionTarget(
-              decoration.slug,
+    const ctx = getForgeContext(rootUri);
+    if (ctx.enabled) {
+      for (const decoration of decorations) {
+        const start = mapNormalizedToOriginal(decoration.startPos, text);
+        const end = mapNormalizedToOriginal(decoration.endPos, text);
+        if (clickOffset < start || clickOffset >= end) continue;
+        if (decoration.type === "mention" && decoration.slug) {
+          const target = resolveMentionTarget(decoration.slug, ctx.webBaseUrl);
+          if (target) {
+            await vscode.commands.executeCommand("vscode.open", target);
+            return;
+          }
+        } else if (
+          decoration.type === "issueReference" &&
+          typeof decoration.issueNumber === "number"
+        ) {
+          const owner = decoration.ownerRepo?.split("/")[0] ?? ctx.owner;
+          const repo = decoration.ownerRepo?.split("/")[1] ?? ctx.repo;
+          if (owner && repo) {
+            const target = resolveIssueRefTarget(
+              owner,
+              repo,
+              decoration.issueNumber,
               ctx.webBaseUrl,
+              ctx.issuePathSegment,
             );
             if (target) {
               await vscode.commands.executeCommand("vscode.open", target);
               return;
-            }
-          } else if (
-            decoration.type === "issueReference" &&
-            typeof decoration.issueNumber === "number"
-          ) {
-            const owner = decoration.ownerRepo?.split("/")[0] ?? ctx.owner;
-            const repo = decoration.ownerRepo?.split("/")[1] ?? ctx.repo;
-            if (owner && repo) {
-              const target = resolveIssueRefTarget(
-                owner,
-                repo,
-                decoration.issueNumber,
-                ctx.webBaseUrl,
-                ctx.issuePathSegment,
-              );
-              if (target) {
-                await vscode.commands.executeCommand("vscode.open", target);
-                return;
-              }
             }
           }
         }

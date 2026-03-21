@@ -1,4 +1,5 @@
 import { MarkdownParser } from "../../parser";
+import { workspace } from "../../test/__mocks__/vscode";
 
 describe("MarkdownParser - Mentions and Issue References", () => {
   let parser: MarkdownParser;
@@ -92,6 +93,21 @@ describe("MarkdownParser - Mentions and Issue References", () => {
   });
 
   describe("@org/team mention", () => {
+    it("should not treat @org/team as mention when immediately followed by #", () => {
+      // @org/team# is the prefix of a repo-scoped issue ref; org/team alone should not be emitted
+      const markdown = "See @org/team#42";
+      const result = parser.extractDecorations(markdown);
+      const orgTeamMention = result.find(
+        (d) => d.type === "mention" && d.slug === "org/team",
+      );
+      expect(orgTeamMention).toBeUndefined();
+      // The full @org/team#42 should be an issueReference
+      const ref = result.find(
+        (d) => d.type === "issueReference" && d.issueNumber === 42,
+      );
+      expect(ref).toBeDefined();
+    });
+
     it("should detect @org/team", () => {
       const markdown = "Notify @org/team please";
       const result = parser.extractDecorations(markdown);
@@ -237,6 +253,30 @@ describe("MarkdownParser - Mentions and Issue References", () => {
       expect(mentions.some((d) => d.slug === "bob")).toBe(true);
       expect(refs.some((d) => d.issueNumber === 42)).toBe(true);
       expect(refs.some((d) => d.issueNumber === 99)).toBe(true);
+    });
+  });
+
+  describe("mentions.enabled = false", () => {
+    const originalGetConfiguration = workspace.getConfiguration;
+
+    beforeEach(() => {
+      (workspace as any).getConfiguration = jest.fn().mockReturnValue({
+        get: (key: string, defaultValue: unknown) => {
+          if (key === "mentions.enabled") return false;
+          return defaultValue;
+        },
+      });
+    });
+
+    afterEach(() => {
+      (workspace as any).getConfiguration = originalGetConfiguration;
+    });
+
+    it("should emit no mention or issueReference decorations when mentions.enabled is false", () => {
+      const markdown = "Hello @alice and see #42 and @org/team and @owner/repo#99";
+      const result = parser.extractDecorations(markdown);
+      expect(result.some((d) => d.type === "mention")).toBe(false);
+      expect(result.some((d) => d.type === "issueReference")).toBe(false);
     });
   });
 

@@ -25,6 +25,9 @@ export interface ForgeContextResult {
 
 const DEFAULT_WEB_BASE = "https://github.com";
 
+/** Cache of git remote detection results keyed by workspace fsPath. */
+const gitRemoteCache = new Map<string, GitRemoteParsed | null>();
+
 /**
  * Determines whether the given workspace root is in forge context
  * (mention and issue references are clickable).
@@ -34,14 +37,21 @@ export function getForgeContext(rootUri: vscode.Uri): ForgeContextResult {
   const override = config.mentions.linksEnabled();
 
   if (override === false) {
-    return {
-      enabled: false,
-      webBaseUrl: DEFAULT_WEB_BASE,
-      issuePathSegment: "issues",
-    };
+    return { enabled: false };
   }
 
-  const fromGit = detectGitRemote(rootUri);
+  const fsPath = rootUri.fsPath;
+  if (!fsPath) {
+    return { enabled: true, webBaseUrl: DEFAULT_WEB_BASE, issuePathSegment: "issues" };
+  }
+
+  let fromGit: GitRemoteParsed | undefined;
+  if (gitRemoteCache.has(fsPath)) {
+    fromGit = gitRemoteCache.get(fsPath) ?? undefined;
+  } else {
+    fromGit = detectGitRemote(fsPath);
+    gitRemoteCache.set(fsPath, fromGit ?? null);
+  }
 
   return {
     enabled: true,
@@ -61,13 +71,7 @@ interface GitRemoteParsed {
   issuePathSegment: string;
 }
 
-function detectGitRemote(
-  workspaceRootUri: vscode.Uri,
-): GitRemoteParsed | undefined {
-  const fsPath = workspaceRootUri.fsPath;
-  if (!fsPath) {
-    return undefined;
-  }
+function detectGitRemote(fsPath: string): GitRemoteParsed | undefined {
   try {
     const url = execSync("git remote get-url origin", {
       cwd: fsPath,

@@ -132,9 +132,8 @@
         },
         "markdownInlineEditor.mentions.linksEnabled": {
           "type": "boolean",
-          "default": true,
           "description": "Override clickable mention and issue reference links",
-          "markdownDescription": "Override git-remote context auto-detection for clickable mention and issue links. True forces links on, false forces links off, and unset uses origin remote auto-detection."
+          "markdownDescription": "Override git-remote context auto-detection for clickable mention and issue links. `true` forces links on; `false` forces links off; leave unset to use origin remote auto-detection."
         },
         "markdownInlineEditor.colors.heading1": {
           "type": "string",
