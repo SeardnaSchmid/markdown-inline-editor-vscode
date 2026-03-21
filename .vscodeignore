@@ -25,6 +25,7 @@ TEST_VALIDATION_REPORT.md
 docs/**
 examples/**
 specs/**
+.specify/**
 
 # Demo assets (only needed for GitHub README, not in extension)
 assets/demo.gif
@@ -66,3 +67,4 @@ Makefile
 eslint.config.mjs
 scripts/**
 cliff.toml
+.eslintignore
