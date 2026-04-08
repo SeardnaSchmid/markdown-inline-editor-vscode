@@ -58,7 +58,7 @@ export default defineConfig(
   },
   // Ignore strict lint rules for test files - no warnings, just ignore
   {
-    files: ['**/__mocks__/**', '**/__tests__/**', '**/*.test.ts', '**/*.test.js'],
+    files: ['src/test/**', '**/__mocks__/**', '**/__tests__/**', '**/*.test.ts', '**/*.test.js'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'off',

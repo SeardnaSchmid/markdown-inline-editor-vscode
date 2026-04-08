@@ -1,10 +1,10 @@
-jest.mock('../../mermaid/mermaid-renderer', () => ({
-  initMermaidRenderer: jest.fn(),
-  renderMermaidSvg: jest.fn(),
-  svgToDataUri: jest.fn((svg: string) => `data:${svg}`),
-  createErrorSvg: jest.fn(() => '<svg></svg>'),
-  saveSvgToHtml: jest.fn(),
-  disposeMermaidRenderer: jest.fn(),
+vi.mock('../../mermaid/mermaid-renderer', () => ({
+  initMermaidRenderer: vi.fn(),
+  renderMermaidSvg: vi.fn(),
+  svgToDataUri: vi.fn((svg: string) => `data:${svg}`),
+  createErrorSvg: vi.fn(() => '<svg></svg>'),
+  saveSvgToHtml: vi.fn(),
+  disposeMermaidRenderer: vi.fn(),
 }));
 
 import { Decorator } from '../../decorator';
@@ -12,7 +12,7 @@ import { MarkdownParseCache } from '../../markdown-parse-cache';
 import { TextDocument, TextEditor, Selection, Uri } from '../../test/__mocks__/vscode';
 import { renderMermaidSvg } from '../../mermaid/mermaid-renderer';
 
-const mockRenderMermaidSvg = renderMermaidSvg as jest.MockedFunction<typeof renderMermaidSvg>;
+const mockRenderMermaidSvg = vi.mocked(renderMermaidSvg);
 
 describe('Decorator - Mermaid diagrams', () => {
   const blockText = [
@@ -46,10 +46,10 @@ describe('Decorator - Mermaid diagrams', () => {
     const decorator = new Decorator(new MarkdownParseCache({} as any));
 
     (decorator as any).activeEditor = editor;
-    const applyMock = jest.fn();
+    const applyMock = vi.fn();
     (decorator as any).mermaidCoordinator.mermaidDecorations = {
       apply: applyMock,
-      clear: jest.fn(),
+      clear: vi.fn(),
     };
 
     await (decorator as any).updateMermaidDiagrams(mermaidBlocks, text, document.version);
@@ -68,10 +68,10 @@ describe('Decorator - Mermaid diagrams', () => {
     const decorator = new Decorator(new MarkdownParseCache({} as any));
 
     (decorator as any).activeEditor = editor;
-    const applyMock = jest.fn();
+    const applyMock = vi.fn();
     (decorator as any).mermaidCoordinator.mermaidDecorations = {
       apply: applyMock,
-      clear: jest.fn(),
+      clear: vi.fn(),
     };
 
     await (decorator as any).updateMermaidDiagrams(mermaidBlocks, text, document.version);
@@ -91,10 +91,10 @@ describe('Decorator - Mermaid diagrams', () => {
     const decorator = new Decorator(new MarkdownParseCache({} as any));
 
     (decorator as any).activeEditor = editor;
-    const applyMock = jest.fn();
+    const applyMock = vi.fn();
     (decorator as any).mermaidCoordinator.mermaidDecorations = {
       apply: applyMock,
-      clear: jest.fn(),
+      clear: vi.fn(),
     };
 
     const secondStart = blockText.length + 2; // "\n\n"

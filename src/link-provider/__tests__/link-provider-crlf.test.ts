@@ -3,8 +3,8 @@ import { workspace } from '../../test/__mocks__/vscode';
 import { createCRLFText, mapNormalizedToOriginal } from '../../parser/__tests__/helpers/crlf-helpers';
 
 // Mock workspace.getConfiguration
-const mockGetConfiguration = jest.fn().mockReturnValue({
-  get: jest.fn().mockReturnValue(false), // defaultBehaviors.diffView.applyDecorations defaults to false
+const mockGetConfiguration = vi.fn().mockReturnValue({
+  get: vi.fn().mockReturnValue(false), // defaultBehaviors.diffView.applyDecorations defaults to false
 });
 
 (workspace as any).getConfiguration = mockGetConfiguration;
@@ -12,7 +12,7 @@ const mockGetConfiguration = jest.fn().mockReturnValue({
 /**
  * Test the position mapping logic used by MarkdownLinkProvider.
  * 
- * Note: We can't directly test MarkdownLinkProvider in Jest due to ESM module loading issues
+ * Note: We can't directly test MarkdownLinkProvider in unit tests due to ESM module loading issues
  * with the parser. However, we can test the core position mapping logic that was added
  * to fix issue #33 (CRLF line endings in table of contents links).
  * 

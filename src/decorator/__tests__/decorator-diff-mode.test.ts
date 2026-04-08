@@ -5,7 +5,7 @@ import { isDiffLikeUri } from '../../diff-context';
  * Tests for diff mode detection functionality.
  * 
  * Note: Full Decorator integration tests are limited due to ESM module loading
- * issues in Jest (similar to decorator-crlf.test.ts). These tests verify the
+ * issues in the test runner (similar to decorator-crlf.test.ts). These tests verify the
  * URI scheme detection logic which is the core of diff mode detection.
  * 
  * Manual testing in VS Code is required to verify full integration:

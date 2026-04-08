@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { MermaidDiagramDecorations } from '../mermaid-diagram-decorations';
 import { window, ColorThemeKind, Range } from '../../test/__mocks__/vscode';
 
@@ -5,7 +6,7 @@ import { window, ColorThemeKind, Range } from '../../test/__mocks__/vscode';
 function makeEditor() {
   const calls = new Map<any, any[][]>();
   return {
-    setDecorations: jest.fn((type: any, ranges: any[]) => {
+    setDecorations: vi.fn((type: any, ranges: any[]) => {
       const prev = calls.get(type) ?? [];
       prev.push(ranges);
       calls.set(type, prev);
@@ -25,7 +26,7 @@ describe('MermaidDiagramDecorations', () => {
   beforeEach(() => {
     // Default to dark theme
     (window.activeColorTheme as any).kind = ColorThemeKind.Dark;
-    (window.createTextEditorDecorationType as jest.Mock).mockClear();
+    (window.createTextEditorDecorationType as Mock).mockClear();
   });
 
   describe('apply()', () => {

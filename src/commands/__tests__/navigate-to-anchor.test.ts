@@ -1,12 +1,13 @@
+import type { Mock } from 'vitest';
 import * as vscode from 'vscode';
 import { createNavigateToAnchorCommand } from '../navigate-to-anchor';
 
 describe('navigate-to-anchor command', () => {
   it('opens document and selects matching heading', async () => {
     let handler: ((anchor: string, documentUri: string) => Promise<void>) | undefined;
-    (vscode.commands.registerCommand as jest.Mock).mockImplementation((_id, cb) => {
+    (vscode.commands.registerCommand as Mock).mockImplementation((_id, cb) => {
       handler = cb;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     });
 
     const document = new (vscode.TextDocument as any)(
@@ -16,9 +17,9 @@ describe('navigate-to-anchor command', () => {
       '# Title\n## My Heading'
     );
     const editor = new (vscode.TextEditor as any)(document, []);
-    editor.revealRange = jest.fn();
-    (vscode.workspace.openTextDocument as jest.Mock).mockResolvedValue(document);
-    (vscode.window.showTextDocument as jest.Mock).mockResolvedValue(editor);
+    editor.revealRange = vi.fn();
+    (vscode.workspace.openTextDocument as Mock).mockResolvedValue(document);
+    (vscode.window.showTextDocument as Mock).mockResolvedValue(editor);
 
     createNavigateToAnchorCommand();
     await handler?.('my-heading', 'file:///test.md');
@@ -30,9 +31,9 @@ describe('navigate-to-anchor command', () => {
 
   it('shows message when anchor is missing', async () => {
     let handler: ((anchor: string, documentUri: string) => Promise<void>) | undefined;
-    (vscode.commands.registerCommand as jest.Mock).mockImplementation((_id, cb) => {
+    (vscode.commands.registerCommand as Mock).mockImplementation((_id, cb) => {
       handler = cb;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     });
 
     const document = new (vscode.TextDocument as any)(
@@ -41,8 +42,8 @@ describe('navigate-to-anchor command', () => {
       1,
       '# Title'
     );
-    (vscode.workspace.openTextDocument as jest.Mock).mockResolvedValue(document);
-    (vscode.window.showTextDocument as jest.Mock).mockResolvedValue(new (vscode.TextEditor as any)(document, []));
+    (vscode.workspace.openTextDocument as Mock).mockResolvedValue(document);
+    (vscode.window.showTextDocument as Mock).mockResolvedValue(new (vscode.TextEditor as any)(document, []));
 
     createNavigateToAnchorCommand();
     await handler?.('missing', 'file:///test.md');

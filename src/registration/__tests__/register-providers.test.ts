@@ -4,7 +4,7 @@ import { registerProviders } from '../register-providers';
 
 describe('registerProviders', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('registers document link and hover providers and returns a link click handler', () => {
@@ -18,7 +18,7 @@ describe('registerProviders', () => {
   });
 
   it('disposes the link click handler through the returned disposable list', () => {
-    const disposeSpy = jest.spyOn(LinkClickHandler.prototype, 'dispose');
+    const disposeSpy = vi.spyOn(LinkClickHandler.prototype, 'dispose');
 
     const result = registerProviders({} as any);
     result.disposables[4].dispose();

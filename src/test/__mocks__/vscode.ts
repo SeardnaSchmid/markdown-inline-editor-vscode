@@ -1,4 +1,6 @@
 // Mock VS Code API for testing
+import { vi } from 'vitest';
+
 class MockRange {
   constructor(
     public start: { line: number; character: number },
@@ -214,21 +216,21 @@ export function resetTextEditorDecorationTypeOptionsCapture(): void {
 }
 
 export const window = {
-  createTextEditorDecorationType: jest.fn((options: unknown) => {
+  createTextEditorDecorationType: vi.fn((options: unknown) => {
     lastTextEditorDecorationTypeOptions = options;
-    return { dispose: jest.fn() };
+    return { dispose: vi.fn() };
   }),
-  createOutputChannel: jest.fn(() => ({
-    appendLine: jest.fn(),
-    dispose: jest.fn(),
+  createOutputChannel: vi.fn(() => ({
+    appendLine: vi.fn(),
+    dispose: vi.fn(),
   })),
   activeTextEditor: undefined as any,
   visibleTextEditors: [] as any[],
   activeColorTheme: {
     kind: ColorThemeKind.Dark,
   },
-  showInformationMessage: jest.fn(),
-  showTextDocument: jest.fn(async (document: MockTextDocument) => new MockTextEditor(document, [])),
+  showInformationMessage: vi.fn(),
+  showTextDocument: vi.fn(async (document: MockTextDocument) => new MockTextEditor(document, [])),
   onDidChangeActiveTextEditor: () => ({ dispose: () => {} }),
   onDidChangeTextEditorSelection: () => ({ dispose: () => {} }),
   onDidChangeActiveColorTheme: () => ({ dispose: () => {} }),
@@ -251,9 +253,9 @@ export const workspace = {
   onDidChangeTextDocument: () => ({ dispose: () => {} }),
   onDidChangeConfiguration: () => ({ dispose: () => {} }),
   onDidRenameFiles: () => ({ dispose: () => {} }),
-  applyEdit: jest.fn().mockResolvedValue(true),
-  openTextDocument: jest.fn(async (uri: ReturnType<typeof Uri.file>) => new MockTextDocument(uri, "markdown", 1, "")),
-  asRelativePath: jest.fn((uri: { toString?: () => string } | string) => {
+  applyEdit: vi.fn().mockResolvedValue(true),
+  openTextDocument: vi.fn(async (uri: ReturnType<typeof Uri.file>) => new MockTextDocument(uri, "markdown", 1, "")),
+  asRelativePath: vi.fn((uri: { toString?: () => string } | string) => {
     const value = typeof uri === "string" ? uri : uri.toString?.() ?? "";
     return value.replace(/^file:\/\/\/?/, "");
   }),
@@ -318,17 +320,17 @@ export const CancellationToken = class {
 };
 
 export const commands = {
-  executeCommand: jest.fn(),
-  registerCommand: jest.fn((_command: string, _handler: (...args: any[]) => any) => ({ dispose: jest.fn() })),
+  executeCommand: vi.fn(),
+  registerCommand: vi.fn((_command: string, _handler: (...args: any[]) => any) => ({ dispose: vi.fn() })),
 };
 
 export const extensions = {
-  getExtension: jest.fn(),
+  getExtension: vi.fn(),
 };
 
 export const languages = {
-  registerDocumentLinkProvider: jest.fn((_selector: unknown, _provider: unknown) => ({ dispose: jest.fn() })),
-  registerHoverProvider: jest.fn((_selector: unknown, _provider: unknown) => ({ dispose: jest.fn() })),
+  registerDocumentLinkProvider: vi.fn((_selector: unknown, _provider: unknown) => ({ dispose: vi.fn() })),
+  registerHoverProvider: vi.fn((_selector: unknown, _provider: unknown) => ({ dispose: vi.fn() })),
 };
 
 export enum TextEditorRevealType {

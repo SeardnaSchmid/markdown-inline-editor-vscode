@@ -9,7 +9,7 @@ import {
 
 describe('editor-decoration-applier', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('creates mapped ranges from normalized offsets', () => {
@@ -31,7 +31,7 @@ describe('editor-decoration-applier', () => {
   it('returns null when the document cannot map positions', () => {
     const editor = {
       document: {
-        positionAt: jest.fn(() => {
+        positionAt: vi.fn(() => {
           throw new Error('boom');
         }),
       },
@@ -48,7 +48,7 @@ describe('editor-decoration-applier', () => {
       'hello'
     );
     const editor = new (vscode.TextEditor as any)(document, []);
-    jest.spyOn(document, 'positionAt')
+    vi.spyOn(document, 'positionAt')
       .mockImplementationOnce(() => ({ line: 0, character: 0 }))
       .mockImplementationOnce(() => ({ line: 0, character: 5 }))
       .mockImplementationOnce(() => {
@@ -109,7 +109,7 @@ describe('editor-decoration-applier', () => {
   });
 
   it('applies ranges, render options, ghost faint, and reports non-empty counts', () => {
-    jest.spyOn(config.emojis, 'enabled').mockReturnValue(true);
+    vi.spyOn(config.emojis, 'enabled').mockReturnValue(true);
 
     const document = new (vscode.TextDocument as any)(
       vscode.Uri.file('/test.md'),
@@ -118,7 +118,7 @@ describe('editor-decoration-applier', () => {
       'hello'
     );
     const editor = new (vscode.TextEditor as any)(document, []);
-    editor.setDecorations = jest.fn();
+    editor.setDecorations = vi.fn();
 
     const hideType = { key: 'hide' };
     const emojiType = { key: 'emoji' };
@@ -138,7 +138,7 @@ describe('editor-decoration-applier', () => {
     const ghostRange = new vscode.Range(new vscode.Position(0, 1), new vscode.Position(0, 2));
     const emojiOption = { range: hideRange, renderOptions: { after: { contentText: 'x' } } };
     const tableOption = { range: hideRange, renderOptions: { before: { contentText: '|' } } };
-    const onApply = jest.fn();
+    const onApply = vi.fn();
 
     applyFilteredDecorations(
       editor as any,
@@ -160,7 +160,7 @@ describe('editor-decoration-applier', () => {
   });
 
   it('clears emoji decorations when emojis are disabled', () => {
-    jest.spyOn(config.emojis, 'enabled').mockReturnValue(false);
+    vi.spyOn(config.emojis, 'enabled').mockReturnValue(false);
 
     const document = new (vscode.TextDocument as any)(
       vscode.Uri.file('/test.md'),
@@ -169,7 +169,7 @@ describe('editor-decoration-applier', () => {
       'hello'
     );
     const editor = new (vscode.TextEditor as any)(document, []);
-    editor.setDecorations = jest.fn();
+    editor.setDecorations = vi.fn();
 
     const emojiType = { key: 'emoji' };
     const registry = {

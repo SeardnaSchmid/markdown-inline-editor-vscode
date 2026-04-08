@@ -1,5 +1,5 @@
-jest.mock('../math-renderer', () => ({
-  renderMathToDataUri: jest.fn(() => 'data:image/svg+xml;base64,PHN2Zy8+'),
+vi.mock('../math-renderer', () => ({
+  renderMathToDataUri: vi.fn(() => 'data:image/svg+xml;base64,PHN2Zy8+'),
 }));
 
 import { window, workspace, ColorThemeKind } from 'vscode';
@@ -8,12 +8,12 @@ import { renderMathToDataUri } from '../math-renderer';
 
 describe('MathDecorations', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
-    jest.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('uses (numLines + 2) * lineHeight for block regions', () => {
-    jest.spyOn(workspace, 'getConfiguration').mockReturnValue({
+    vi.spyOn(workspace, 'getConfiguration').mockReturnValue({
       get: <T>(key: string, defaultValue: T): T => {
         if (key === 'fontSize') return 14 as T;
         if (key === 'lineHeight') return 0 as T;
@@ -21,7 +21,7 @@ describe('MathDecorations', () => {
       },
     } as unknown as ReturnType<typeof workspace.getConfiguration>);
 
-    const editor = { setDecorations: jest.fn() } as any;
+    const editor = { setDecorations: vi.fn() } as any;
     const decorations = new MathDecorations();
     decorations.apply(editor, [
       {
@@ -47,10 +47,10 @@ describe('MathDecorations', () => {
   });
 
   it('does not set block-only width/height auto styling on decoration before options', () => {
-    jest.spyOn(window, 'createTextEditorDecorationType');
+    vi.spyOn(window, 'createTextEditorDecorationType');
     window.activeColorTheme.kind = ColorThemeKind.Dark;
 
-    const editor = { setDecorations: jest.fn() } as any;
+    const editor = { setDecorations: vi.fn() } as any;
     const decorations = new MathDecorations();
     decorations.apply(editor, [
       {
@@ -65,7 +65,7 @@ describe('MathDecorations', () => {
       },
     ]);
 
-    const options = (window.createTextEditorDecorationType as jest.Mock).mock.calls[0][0];
+    const options = vi.mocked(window.createTextEditorDecorationType).mock.calls[0][0];
     expect(options.before.width).toBeUndefined();
     expect(options.before.height).toBeUndefined();
   });

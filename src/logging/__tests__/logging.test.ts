@@ -1,13 +1,14 @@
+import type { Mock } from 'vitest';
 import * as vscode from 'vscode';
 import { disposeLogger, logDebug, logError, logPerformanceMetric, logWarn } from '../../logging';
 
 describe('logging', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
     disposeLogger();
   });
 
@@ -22,13 +23,13 @@ describe('logging', () => {
     logError('error message', 'bad');
 
     expect(vscode.window.createOutputChannel).toHaveBeenCalledTimes(1);
-    const channel = (vscode.window.createOutputChannel as jest.Mock).mock.results[0].value;
+    const channel = (vscode.window.createOutputChannel as Mock).mock.results[0].value;
     expect(channel.appendLine).toHaveBeenCalledWith(expect.stringContaining('[warn] warning message'));
     expect(channel.appendLine).toHaveBeenCalledWith(expect.stringContaining('[error] error message'));
   });
 
   it('writes performance metrics only when performance logging is enabled', () => {
-    jest.spyOn(vscode.workspace, 'getConfiguration').mockReturnValue({
+    vi.spyOn(vscode.workspace, 'getConfiguration').mockReturnValue({
       get: <T>(key: string, defaultValue: T): T => {
         if (key === 'debug.performance.enabled') {
           return true as T;
@@ -39,7 +40,7 @@ describe('logging', () => {
 
     logPerformanceMetric('decorator.update', { totalMs: 12, decorations: 5 });
 
-    const channel = (vscode.window.createOutputChannel as jest.Mock).mock.results[0].value;
+    const channel = (vscode.window.createOutputChannel as Mock).mock.results[0].value;
     expect(channel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining('[perf] decorator.update totalMs=12 decorations=5')
     );
@@ -47,7 +48,7 @@ describe('logging', () => {
 
   it('disposes the output channel when requested', () => {
     logWarn('warning message');
-    const channel = (vscode.window.createOutputChannel as jest.Mock).mock.results[0].value;
+    const channel = (vscode.window.createOutputChannel as Mock).mock.results[0].value;
 
     disposeLogger();
 

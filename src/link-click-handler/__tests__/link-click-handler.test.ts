@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { LinkClickHandler } from "../../link-click-handler";
 import { MarkdownParser } from "../../parser";
 import { MarkdownParseCache } from "../../markdown-parse-cache";
@@ -13,14 +14,14 @@ import {
 } from "../../test/__mocks__/vscode";
 
 // Mock workspace.getConfiguration
-const mockGetConfiguration = jest.fn().mockReturnValue({
-  get: jest.fn().mockReturnValue(false),
+const mockGetConfiguration = vi.fn().mockReturnValue({
+  get: vi.fn().mockReturnValue(false),
 });
 
 (workspace as any).getConfiguration = mockGetConfiguration;
 
 // Mock commands.executeCommand
-const mockExecuteCommand = jest.fn();
+const mockExecuteCommand = vi.fn();
 (commands as any).executeCommand = mockExecuteCommand;
 
 describe("LinkClickHandler", () => {
@@ -246,7 +247,7 @@ describe("LinkClickHandler", () => {
 
     it("should open mention targets when mention links are enabled", async () => {
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string, defaultValue?: unknown) => {
+        get: vi.fn((key: string, defaultValue?: unknown) => {
           if (key === "mentions.enabled") return true;
           if (key === "mentions.linksEnabled") return true;
           return defaultValue;
@@ -278,7 +279,7 @@ describe("LinkClickHandler", () => {
 
     it("should open repo-scoped issue reference targets", async () => {
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string, defaultValue?: unknown) => {
+        get: vi.fn((key: string, defaultValue?: unknown) => {
           if (key === "mentions.enabled") return true;
           if (key === "mentions.linksEnabled") return true;
           return defaultValue;
@@ -310,7 +311,7 @@ describe("LinkClickHandler", () => {
 
     it("should not open mention targets when mention links are explicitly disabled", async () => {
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string, defaultValue?: unknown) => {
+        get: vi.fn((key: string, defaultValue?: unknown) => {
           if (key === "mentions.enabled") return true;
           if (key === "mentions.linksEnabled") return false;
           return defaultValue;
@@ -348,7 +349,7 @@ describe("LinkClickHandler", () => {
       await (handler as any).handleClick(editor, position);
 
       expect(window.createOutputChannel).toHaveBeenCalledTimes(1);
-      const channel = (window.createOutputChannel as jest.Mock).mock.results[0].value;
+      const channel = (window.createOutputChannel as Mock).mock.results[0].value;
       expect(channel.appendLine).toHaveBeenCalledWith(expect.stringContaining('[warn] Failed to open link'));
     });
   });

@@ -3,8 +3,10 @@
  * raw LaTeX is shown (no math decoration applied for that region).
  */
 
-jest.mock('../../math/math-renderer', () => ({
-  renderMathToDataUri: jest.fn((source: string) => `data:image/svg+xml,${source}`),
+import type { Mock } from 'vitest';
+
+vi.mock('../../math/math-renderer', () => ({
+  renderMathToDataUri: vi.fn((source: string) => `data:image/svg+xml,${source}`),
 }));
 
 import { Decorator } from '../../decorator';
@@ -19,7 +21,7 @@ const mathRegions = [
 function createDecoratorWithMathCache(customText?: string, customMathRegions?: typeof mathRegions): Decorator & {
   parseCache: { get: (doc: ReturnType<typeof TextDocument>) => unknown };
   applyMathDecorations: (regions: typeof mathRegions, normalizedText: string) => void;
-  mathDecorations: { apply: jest.Mock; clear: jest.Mock };
+  mathDecorations: { apply: Mock; clear: Mock };
 } {
   const entry = {
     version: 1,
@@ -36,15 +38,15 @@ function createDecoratorWithMathCache(customText?: string, customMathRegions?: t
   };
   const decorator = new Decorator(parseCache as any) as any;
   decorator.mathDecorations = {
-    apply: jest.fn(),
-    clear: jest.fn(),
+    apply: vi.fn(),
+    clear: vi.fn(),
   };
   return decorator;
 }
 
 describe('Decorator - Math reveal on select', () => {
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('applies math decoration when cursor is outside math region', () => {
@@ -56,7 +58,7 @@ describe('Decorator - Math reveal on select', () => {
     (decorator as any).updateDecorationsInternal();
 
     expect(decorator.mathDecorations.apply).toHaveBeenCalled();
-    const calls = (decorator.mathDecorations.apply as jest.Mock).mock.calls;
+    const calls = (decorator.mathDecorations.apply as Mock).mock.calls;
     const lastCall = calls[calls.length - 1];
     const regionsWithRanges = lastCall[1];
     expect(regionsWithRanges).toHaveLength(1);
@@ -72,7 +74,7 @@ describe('Decorator - Math reveal on select', () => {
     (decorator as any).updateDecorationsInternal();
 
     expect(decorator.mathDecorations.apply).toHaveBeenCalled();
-    const calls = (decorator.mathDecorations.apply as jest.Mock).mock.calls;
+    const calls = (decorator.mathDecorations.apply as Mock).mock.calls;
     const lastCall = calls[calls.length - 1];
     const regionsWithRanges = lastCall[1];
     expect(regionsWithRanges).toHaveLength(1);
@@ -88,7 +90,7 @@ describe('Decorator - Math reveal on select', () => {
     (decorator as any).updateDecorationsInternal();
 
     expect(decorator.mathDecorations.apply).toHaveBeenCalled();
-    const calls = (decorator.mathDecorations.apply as jest.Mock).mock.calls;
+    const calls = (decorator.mathDecorations.apply as Mock).mock.calls;
     const lastCall = calls[calls.length - 1];
     const regionsWithRanges = lastCall[1];
     expect(regionsWithRanges[0].range).toBeNull();
@@ -106,7 +108,7 @@ describe('Decorator - Math reveal on select', () => {
     decorator.setActiveEditor(editor);
     (decorator as any).updateDecorationsInternal();
 
-    const lastCall = (decorator.mathDecorations.apply as jest.Mock).mock.calls.slice(-1)[0];
+    const lastCall = (decorator.mathDecorations.apply as Mock).mock.calls.slice(-1)[0];
     const regionsWithRanges = lastCall[1];
     expect(regionsWithRanges).toHaveLength(1);
     expect(regionsWithRanges[0].range).toBeNull();
@@ -126,7 +128,7 @@ describe('Decorator - Math reveal on select', () => {
     decorator.setActiveEditor(editor);
     (decorator as any).updateDecorationsInternal();
 
-    const lastCall = (decorator.mathDecorations.apply as jest.Mock).mock.calls.slice(-1)[0];
+    const lastCall = (decorator.mathDecorations.apply as Mock).mock.calls.slice(-1)[0];
     const regionsWithRanges = lastCall[1];
     expect(regionsWithRanges[0].range).not.toBeNull();
   });
@@ -144,7 +146,7 @@ describe('Decorator - Math reveal on select', () => {
     (decorator as any).updateDecorationsInternal();
 
     expect(decorator.mathDecorations.apply).toHaveBeenCalled();
-    const lastCall = (decorator.mathDecorations.apply as jest.Mock).mock.calls.slice(-1)[0];
+    const lastCall = (decorator.mathDecorations.apply as Mock).mock.calls.slice(-1)[0];
     const regionsWithRanges = lastCall[1];
     expect(regionsWithRanges).toHaveLength(2);
     expect(regionsWithRanges[0].region.numLines).toBe(1);
@@ -164,13 +166,13 @@ describe('Decorator - Math reveal on select', () => {
     decorator.setActiveEditor(editor);
     expect(() => (decorator as any).updateDecorationsInternal()).not.toThrow();
     expect(decorator.mathDecorations.apply).toHaveBeenCalled();
-    const lastCall = (decorator.mathDecorations.apply as jest.Mock).mock.calls.slice(-1)[0];
+    const lastCall = (decorator.mathDecorations.apply as Mock).mock.calls.slice(-1)[0];
     expect(lastCall[1]).toHaveLength(1);
     expect(lastCall[1][0].region.source).toBe('\\invalid{\n');
   });
 
   it('clears math decorations when math setting is disabled', () => {
-    jest.spyOn(config.math, 'enabled').mockReturnValue(false);
+    vi.spyOn(config.math, 'enabled').mockReturnValue(false);
 
     const document = new TextDocument(Uri.file('test.md'), 'markdown', 1, text);
     const editor = new TextEditor(document, [new Selection(new Position(0, 0), new Position(0, 0))]);
@@ -194,7 +196,7 @@ describe('Decorator - Math reveal on select', () => {
     decorator.setActiveEditor(editor);
     (decorator as any).updateDecorationsInternal();
 
-    const lastCall = (decorator.mathDecorations.apply as jest.Mock).mock.calls.slice(-1)[0];
+    const lastCall = (decorator.mathDecorations.apply as Mock).mock.calls.slice(-1)[0];
     const regionsWithRanges = lastCall[1];
     expect(regionsWithRanges).toHaveLength(2);
     expect(regionsWithRanges[0].range).not.toBeNull();

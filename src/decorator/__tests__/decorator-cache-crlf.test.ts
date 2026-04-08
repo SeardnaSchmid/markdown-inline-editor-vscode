@@ -2,7 +2,7 @@ import { TextDocument, Uri } from '../../test/__mocks__/vscode';
 import { createCRLFText } from '../../parser/__tests__/helpers/crlf-helpers';
 
 describe('Decorator - Cache with CRLF', () => {
-  // Note: Full decorator cache tests are limited due to ESM module loading issues in Jest.
+  // Note: Full decorator cache tests are limited due to ESM module loading issues in tests.
   // These tests verify CRLF handling in mock documents.
   // The critical position mapping tests are in decorator-position-mapping.test.ts
 

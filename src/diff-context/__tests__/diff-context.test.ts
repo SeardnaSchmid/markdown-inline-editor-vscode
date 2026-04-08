@@ -1,8 +1,8 @@
 import { TextDocument, TextEditor, Uri, workspace } from '../../test/__mocks__/vscode';
 import { isDiffLikeUri, isDiffViewVisible, shouldSkipInDiffView } from '../../diff-context';
 
-const mockGetConfiguration = jest.fn().mockReturnValue({
-  get: jest.fn().mockReturnValue(false),
+const mockGetConfiguration = vi.fn().mockReturnValue({
+  get: vi.fn().mockReturnValue(false),
 });
 
 (workspace as any).getConfiguration = mockGetConfiguration;
@@ -78,7 +78,7 @@ describe('diff-context', () => {
     it('returns false for regular file documents', () => {
       const document = new TextDocument(Uri.file('/path/to/file.md'), 'markdown', 1, 'text');
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn().mockReturnValue(false),
+        get: vi.fn().mockReturnValue(false),
       });
 
       expect(shouldSkipInDiffView(document as any)).toBe(false);
@@ -87,7 +87,7 @@ describe('diff-context', () => {
     it('returns true for diff schemes when decorations disabled', () => {
       const document = new TextDocument(Uri.parse('git:/path/to/file.md'), 'markdown', 1, 'text');
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn().mockReturnValue(false),
+        get: vi.fn().mockReturnValue(false),
       });
 
       expect(shouldSkipInDiffView(document as any)).toBe(true);
@@ -96,7 +96,7 @@ describe('diff-context', () => {
     it('returns false for diff schemes when decorations enabled', () => {
       const document = new TextDocument(Uri.parse('git:/path/to/file.md'), 'markdown', 1, 'text');
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn().mockReturnValue(true),
+        get: vi.fn().mockReturnValue(true),
       });
 
       expect(shouldSkipInDiffView(document as any)).toBe(false);

@@ -6,8 +6,8 @@ src/**
 .npmignore
 tsconfig.json
 tsconfig.build.json
-jest.config.js
-jest.setup.js
+tsconfig.vitest.json
+vitest.config.ts
 *.map
 **/*.map
 dist/**/*.map

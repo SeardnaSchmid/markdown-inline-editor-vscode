@@ -6,7 +6,7 @@
  * internal shape, which is the same pattern used in decorator-filtering.test.ts.
  */
 
-jest.mock('../../parser', () => ({
+vi.mock('../../parser', () => ({
   MarkdownParser: class {
     extractDecorations() {
       return [];

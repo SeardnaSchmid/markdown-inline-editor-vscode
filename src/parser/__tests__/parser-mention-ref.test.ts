@@ -260,7 +260,7 @@ describe("MarkdownParser - Mentions and Issue References", () => {
     const originalGetConfiguration = workspace.getConfiguration;
 
     beforeEach(() => {
-      (workspace as any).getConfiguration = jest.fn().mockReturnValue({
+      (workspace as any).getConfiguration = vi.fn().mockReturnValue({
         get: (key: string, defaultValue: unknown) => {
           if (key === "mentions.enabled") return false;
           return defaultValue;

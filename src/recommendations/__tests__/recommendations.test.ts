@@ -1,18 +1,19 @@
+import type { Mock } from 'vitest';
 import * as vscode from 'vscode';
 import { checkRecommendedExtensions } from '../../recommendations';
 
 describe('recommendations', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (vscode.extensions.getExtension as any) = jest.fn(() => undefined);
-    (vscode.window.showInformationMessage as jest.Mock).mockResolvedValue('Install');
+    vi.clearAllMocks();
+    (vscode.extensions.getExtension as any) = vi.fn(() => undefined);
+    (vscode.window.showInformationMessage as Mock).mockResolvedValue('Install');
   });
 
   it('prompts for missing recommended extensions once', async () => {
     const context = {
       globalState: {
-        get: jest.fn(() => false),
-        update: jest.fn(() => Promise.resolve()),
+        get: vi.fn(() => false),
+        update: vi.fn(() => Promise.resolve()),
       },
     };
 
@@ -29,8 +30,8 @@ describe('recommendations', () => {
   it('skips already-shown recommendations', () => {
     const context = {
       globalState: {
-        get: jest.fn(() => true),
-        update: jest.fn(() => Promise.resolve()),
+        get: vi.fn(() => true),
+        update: vi.fn(() => Promise.resolve()),
       },
     };
 
@@ -40,11 +41,11 @@ describe('recommendations', () => {
   });
 
   it('skips installed extensions', () => {
-    (vscode.extensions.getExtension as jest.Mock).mockReturnValue({ id: 'installed' });
+    (vscode.extensions.getExtension as Mock).mockReturnValue({ id: 'installed' });
     const context = {
       globalState: {
-        get: jest.fn(() => false),
-        update: jest.fn(() => Promise.resolve()),
+        get: vi.fn(() => false),
+        update: vi.fn(() => Promise.resolve()),
       },
     };
 

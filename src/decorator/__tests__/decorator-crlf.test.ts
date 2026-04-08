@@ -2,7 +2,7 @@ import { TextDocument, Uri } from '../../test/__mocks__/vscode';
 import { createCRLFText } from '../../parser/__tests__/helpers/crlf-helpers';
 
 describe('Decorator - CRLF Line Endings', () => {
-  // Note: Full decorator tests are limited due to ESM module loading issues in Jest.
+  // Note: Full decorator tests are limited due to ESM module loading issues in tests.
   // The critical position mapping tests are in decorator-position-mapping.test.ts
 
   describe('CRLF text handling', () => {

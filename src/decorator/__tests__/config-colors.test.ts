@@ -1,8 +1,8 @@
 import { workspace } from '../../test/__mocks__/vscode';
 import { config } from '../../config';
 
-const mockGet = jest.fn();
-const mockGetConfiguration = jest.fn().mockReturnValue({ get: mockGet });
+const mockGet = vi.fn();
+const mockGetConfiguration = vi.fn().mockReturnValue({ get: mockGet });
 
 (workspace as any).getConfiguration = mockGetConfiguration;
 

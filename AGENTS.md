@@ -24,7 +24,7 @@ Before making changes:
 - TypeScript (strict mode)
 - VS Code Extension API
 - [remark](https://github.com/remarkjs/remark) for markdown parsing
-- Jest for testing
+- Vitest for testing
 - esbuild for bundling
 
 ## Project Structure
@@ -89,7 +89,7 @@ npm run clean   # Remove build artifacts
 npm run package # Package extension as .vsix
 ```
 
-**Testing:**
+**Testing (Vitest):**
 ```bash
 npm test              # Run all tests
 npm run test:watch     # Run tests in watch mode
@@ -152,7 +152,7 @@ npm run release       # Automated release (see Release section)
 - Mock VS Code API when needed (see existing tests for patterns)
 
 **Current Test Coverage:**
-- 438+ passing tests across 33 test suites (parser, hover providers, click handler, decorator, and more)
+- 770+ passing tests across 60+ test files (parser, hover providers, click handler, decorator, and more)
 - Maintain or improve this coverage
 
 ### 4. Code Style

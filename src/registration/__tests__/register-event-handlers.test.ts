@@ -4,24 +4,24 @@ import { registerEventHandlers } from '../register-event-handlers';
 
 describe('registerEventHandlers', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('registers editor, workspace, and theme listeners', () => {
     const decorator = {
-      setActiveEditor: jest.fn(),
-      updateDecorationsForSelection: jest.fn(),
-      updateDecorationsFromChange: jest.fn(),
-      renameFile: jest.fn(),
-      updateDiffViewDecorationSetting: jest.fn(),
-      recreateGhostFaintDecorationType: jest.fn(),
-      recreateFrontmatterDelimiterDecorationType: jest.fn(),
-      recreateCodeBlockLanguageDecorationType: jest.fn(),
-      recreateColorDependentTypes: jest.fn(),
-      clearMathDecorationCache: jest.fn(),
+      setActiveEditor: vi.fn(),
+      updateDecorationsForSelection: vi.fn(),
+      updateDecorationsFromChange: vi.fn(),
+      renameFile: vi.fn(),
+      updateDiffViewDecorationSetting: vi.fn(),
+      recreateGhostFaintDecorationType: vi.fn(),
+      recreateFrontmatterDelimiterDecorationType: vi.fn(),
+      recreateCodeBlockLanguageDecorationType: vi.fn(),
+      recreateColorDependentTypes: vi.fn(),
+      clearMathDecorationCache: vi.fn(),
     };
     const linkClickHandler = {
-      setEnabled: jest.fn(),
+      setEnabled: vi.fn(),
     };
 
     const disposables = registerEventHandlers(decorator as any, linkClickHandler as any);
@@ -41,21 +41,21 @@ describe('registerEventHandlers', () => {
       | ((event: { files: Array<{ oldUri: vscode.Uri; newUri: vscode.Uri }> }) => void)
       | undefined;
 
-    vscode.window.onDidChangeActiveTextEditor = jest.fn((listener) => {
+    vscode.window.onDidChangeActiveTextEditor = vi.fn((listener) => {
       activeEditorListener = listener;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     }) as any;
-    vscode.window.onDidChangeTextEditorSelection = jest.fn((listener) => {
+    vscode.window.onDidChangeTextEditorSelection = vi.fn((listener) => {
       selectionListener = listener;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     }) as any;
-    vscode.workspace.onDidChangeTextDocument = jest.fn((listener) => {
+    vscode.workspace.onDidChangeTextDocument = vi.fn((listener) => {
       documentChangeListener = listener;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     }) as any;
-    vscode.workspace.onDidRenameFiles = jest.fn((listener) => {
+    vscode.workspace.onDidRenameFiles = vi.fn((listener) => {
       renameListener = listener;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     }) as any;
 
     const document = new (vscode.TextDocument as any)(
@@ -68,19 +68,19 @@ describe('registerEventHandlers', () => {
     (vscode.window as any).activeTextEditor = editor;
 
     const decorator = {
-      setActiveEditor: jest.fn(),
-      updateDecorationsForSelection: jest.fn(),
-      updateDecorationsFromChange: jest.fn(),
-      renameFile: jest.fn(),
-      updateDiffViewDecorationSetting: jest.fn(),
-      recreateGhostFaintDecorationType: jest.fn(),
-      recreateFrontmatterDelimiterDecorationType: jest.fn(),
-      recreateCodeBlockLanguageDecorationType: jest.fn(),
-      recreateColorDependentTypes: jest.fn(),
-      clearMathDecorationCache: jest.fn(),
+      setActiveEditor: vi.fn(),
+      updateDecorationsForSelection: vi.fn(),
+      updateDecorationsFromChange: vi.fn(),
+      renameFile: vi.fn(),
+      updateDiffViewDecorationSetting: vi.fn(),
+      recreateGhostFaintDecorationType: vi.fn(),
+      recreateFrontmatterDelimiterDecorationType: vi.fn(),
+      recreateCodeBlockLanguageDecorationType: vi.fn(),
+      recreateColorDependentTypes: vi.fn(),
+      clearMathDecorationCache: vi.fn(),
     };
 
-    registerEventHandlers(decorator as any, { setEnabled: jest.fn() } as any);
+    registerEventHandlers(decorator as any, { setEnabled: vi.fn() } as any);
 
     activeEditorListener?.(editor);
     selectionListener?.({ kind: vscode.TextEditorSelectionChangeKind.Mouse });
@@ -103,32 +103,32 @@ describe('registerEventHandlers', () => {
       | undefined;
     let themeListener: (() => void) | undefined;
 
-    vscode.workspace.onDidChangeConfiguration = jest.fn((listener) => {
+    vscode.workspace.onDidChangeConfiguration = vi.fn((listener) => {
       configurationListener = listener;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     }) as any;
-    vscode.window.onDidChangeActiveColorTheme = jest.fn((listener) => {
+    vscode.window.onDidChangeActiveColorTheme = vi.fn((listener) => {
       themeListener = listener;
-      return { dispose: jest.fn() };
+      return { dispose: vi.fn() };
     }) as any;
 
-    jest.spyOn(config.diffView, 'applyDecorations').mockReturnValue(false);
-    jest.spyOn(config.links, 'singleClickOpen').mockReturnValue(true);
+    vi.spyOn(config.diffView, 'applyDecorations').mockReturnValue(false);
+    vi.spyOn(config.links, 'singleClickOpen').mockReturnValue(true);
 
     const decorator = {
-      setActiveEditor: jest.fn(),
-      updateDecorationsForSelection: jest.fn(),
-      updateDecorationsFromChange: jest.fn(),
-      renameFile: jest.fn(),
-      updateDiffViewDecorationSetting: jest.fn(),
-      recreateGhostFaintDecorationType: jest.fn(),
-      recreateFrontmatterDelimiterDecorationType: jest.fn(),
-      recreateCodeBlockLanguageDecorationType: jest.fn(),
-      recreateColorDependentTypes: jest.fn(),
-      clearMathDecorationCache: jest.fn(),
+      setActiveEditor: vi.fn(),
+      updateDecorationsForSelection: vi.fn(),
+      updateDecorationsFromChange: vi.fn(),
+      renameFile: vi.fn(),
+      updateDiffViewDecorationSetting: vi.fn(),
+      recreateGhostFaintDecorationType: vi.fn(),
+      recreateFrontmatterDelimiterDecorationType: vi.fn(),
+      recreateCodeBlockLanguageDecorationType: vi.fn(),
+      recreateColorDependentTypes: vi.fn(),
+      clearMathDecorationCache: vi.fn(),
     };
     const linkClickHandler = {
-      setEnabled: jest.fn(),
+      setEnabled: vi.fn(),
     };
 
     registerEventHandlers(decorator as any, linkClickHandler as any);
