@@ -1,13 +1,12 @@
 import * as vscode from "vscode";
-import { mapNormalizedToOriginal } from "./position-mapping";
-import {
-  resolveImageTarget,
-  resolveLinkTarget,
-  resolveMentionTarget,
-  resolveIssueRefTarget,
-} from "./link-targets";
 import { MarkdownParseCache } from "./markdown-parse-cache";
-import { getForgeContext } from "./forge-context";
+import {
+  findDecorationAtOffset,
+  isLinkLikeDecoration,
+  resolveInteractionTarget,
+  toInteractionUri,
+} from "./link-interactions/shared";
+import { logWarn } from "./logging";
 
 /**
  * Handles single-click navigation for markdown links and images.
@@ -81,101 +80,30 @@ export class LinkClickHandler {
     const text = parseEntry.text;
     const decorations = parseEntry.decorations;
     const clickOffset = document.offsetAt(position);
-
-    // Find if the click is on a link or image
-    for (const decoration of decorations) {
-      if (
-        (decoration.type === "link" || decoration.type === "image") &&
-        decoration.url
-      ) {
-        const start = mapNormalizedToOriginal(decoration.startPos, text);
-        const end = mapNormalizedToOriginal(decoration.endPos, text);
-        if (clickOffset >= start && clickOffset < end) {
-          await this.openLink(decoration.url, decoration.type, document.uri);
-          return;
-        }
-      }
-    }
-
-    // Mention and issue-reference: compute URL from metadata when in remote context.
-    // Fall back to document directory when there is no workspace folder so git detection still works.
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-    const rootUri =
-      workspaceFolder?.uri ?? vscode.Uri.joinPath(document.uri, "..");
-    const ctx = getForgeContext(rootUri);
-    if (ctx.enabled) {
-      for (const decoration of decorations) {
-        const start = mapNormalizedToOriginal(decoration.startPos, text);
-        const end = mapNormalizedToOriginal(decoration.endPos, text);
-        if (clickOffset < start || clickOffset >= end) continue;
-        if (decoration.type === "mention" && decoration.slug) {
-          const target = resolveMentionTarget(decoration.slug, ctx.webBaseUrl);
-          if (target) {
-            await vscode.commands.executeCommand("vscode.open", target);
-            return;
-          }
-        } else if (
-          decoration.type === "issueReference" &&
-          typeof decoration.issueNumber === "number"
-        ) {
-          const owner = decoration.ownerRepo?.split("/")[0] ?? ctx.owner;
-          const repo = decoration.ownerRepo?.split("/")[1] ?? ctx.repo;
-          if (owner && repo) {
-            const target = resolveIssueRefTarget(
-              owner,
-              repo,
-              decoration.issueNumber,
-              ctx.webBaseUrl,
-              ctx.issuePathSegment,
-            );
-            if (target) {
-              await vscode.commands.executeCommand("vscode.open", target);
-              return;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Opens a link or image based on its URL and type.
-   *
-   * @param url - The URL to open
-   * @param type - The decoration type ('link' or 'image')
-   * @param documentUri - The URI of the current document
-   */
-  private async openLink(
-    url: string,
-    type: "link" | "image",
-    documentUri: vscode.Uri,
-  ): Promise<void> {
-    const trimmed = url.trim();
-
-    if (type === "image") {
-      const target = resolveImageTarget(trimmed, documentUri);
-      if (!target) {
-        return;
-      }
-      await vscode.commands.executeCommand("vscode.open", target);
+    const decoration = findDecorationAtOffset(
+      decorations,
+      text,
+      clickOffset,
+      document,
+      isLinkLikeDecoration
+    );
+    if (!decoration) {
       return;
     }
 
-    const target = resolveLinkTarget(trimmed, documentUri);
+    const target = resolveInteractionTarget(decoration, document.uri);
     if (!target) {
       return;
     }
 
-    if (target.kind === "command") {
-      await vscode.commands.executeCommand(target.command, ...target.args);
-      return;
-    }
-
     try {
-      await vscode.commands.executeCommand("vscode.open", target.uri);
+      if (target.kind === 'command') {
+        await vscode.commands.executeCommand(target.command, ...target.args);
+        return;
+      }
+      await vscode.commands.executeCommand("vscode.open", toInteractionUri(target));
     } catch (error) {
-      // File might not exist, silently fail
-      console.warn("Failed to open link:", error);
+      logWarn('Failed to open link', error);
     }
   }
 

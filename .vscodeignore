@@ -3,7 +3,6 @@
 .vscode-test/**
 src/**
 .gitignore
-.eslintrc.json
 .npmignore
 tsconfig.json
 tsconfig.build.json
@@ -28,10 +27,12 @@ specs/**
 .specify/**
 
 # Demo assets (only needed for GitHub README, not in extension)
+assets/autoplay-demo.gif
 assets/demo.gif
 assets/example-video.gif
 assets/example-ui.png
 assets/example-ui-selected-line.png
+assets/icon.png~
 
 # Build artifacts
 branding/**

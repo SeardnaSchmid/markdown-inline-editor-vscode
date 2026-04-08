@@ -1,5 +1,6 @@
 import type * as vscode from 'vscode';
 import type { DecorationRange, ScopeRange, MermaidBlock, MathRegion, MarkdownParser } from './parser';
+import { logDebug, logPerformanceMetric } from './logging';
 
 export type ParseEntry = {
   version: number;
@@ -25,11 +26,14 @@ export class MarkdownParseCache {
     const cached = this.cache.get(cacheKey);
     if (cached && cached.version === document.version) {
       cached.lastAccessed = ++this.accessCounter;
+      logDebug('parse cache hit', { uri: cacheKey, version: document.version });
       return cached;
     }
 
     const text = document.getText();
+    const parseStart = Date.now();
     const { decorations, scopes, mermaidBlocks, mathRegions } = this.parser.extractDecorationsWithScopes(text);
+    const parseDurationMs = Date.now() - parseStart;
     const entry: CacheEntry = {
       version: document.version,
       text,
@@ -45,6 +49,15 @@ export class MarkdownParseCache {
     }
 
     this.cache.set(cacheKey, entry);
+    logPerformanceMetric('parse-cache.get', {
+      uri: cacheKey,
+      version: document.version,
+      parseMs: parseDurationMs,
+      decorations: decorations.length,
+      scopes: scopes.length,
+      mermaidBlocks: mermaidBlocks.length,
+      mathRegions: mathRegions.length,
+    });
     return entry;
   }
 
@@ -72,6 +85,7 @@ export class MarkdownParseCache {
     }
 
     if (lruKey) {
+      logDebug('parse cache evict', { uri: lruKey });
       this.cache.delete(lruKey);
     }
   }

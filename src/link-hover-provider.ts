@@ -1,10 +1,14 @@
 import * as vscode from "vscode";
-import { mapNormalizedToOriginal } from "./position-mapping";
 import { shouldSkipInDiffView } from "./diff-context";
 import { config } from "./config";
 import { MarkdownParseCache } from "./markdown-parse-cache";
-import { getForgeContext } from "./forge-context";
-import { resolveIssueRefTarget, resolveMentionTarget } from "./link-targets";
+import {
+  createDecorationRange,
+  findDecorationAtOffset,
+  getInteractionDisplayValue,
+  isLinkLikeDecoration,
+  resolveInteractionTarget,
+} from "./link-interactions/shared";
 
 /**
  * Provides a hover that shows the target URL for markdown links, mentions, and issue references.
@@ -37,72 +41,33 @@ export class MarkdownLinkHoverProvider implements vscode.HoverProvider {
     const decorations = parseEntry.decorations;
     const hoverOffset = document.offsetAt(position);
     const singleClickEnabled = config.links.singleClickOpen();
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
-    const rootUri =
-      workspaceFolder?.uri ?? vscode.Uri.joinPath(document.uri, "..");
-    const ctx = getForgeContext(rootUri);
-
-    for (const decoration of decorations) {
-      if (token.isCancellationRequested) {
-        return;
-      }
-
-      const start = mapNormalizedToOriginal(decoration.startPos, text);
-      const end = mapNormalizedToOriginal(decoration.endPos, text);
-
-      if (hoverOffset < start || hoverOffset >= end) {
-        continue;
-      }
-
-      let targetUrl: string | undefined;
-
-      if (decoration.type === "link" && decoration.url) {
-        targetUrl = decoration.url;
-      } else if (
-        ctx.enabled &&
-        decoration.type === "mention" &&
-        decoration.slug
-      ) {
-        targetUrl = resolveMentionTarget(
-          decoration.slug,
-          ctx.webBaseUrl,
-        )?.toString();
-      } else if (
-        ctx.enabled &&
-        decoration.type === "issueReference" &&
-        typeof decoration.issueNumber === "number"
-      ) {
-        const owner = decoration.ownerRepo?.split("/")[0] ?? ctx.owner;
-        const repo = decoration.ownerRepo?.split("/")[1] ?? ctx.repo;
-        if (owner && repo) {
-          targetUrl = resolveIssueRefTarget(
-            owner,
-            repo,
-            decoration.issueNumber,
-            ctx.webBaseUrl,
-            ctx.issuePathSegment,
-          )?.toString();
-        }
-      }
-
-      if (!targetUrl) {
-        continue;
-      }
-
-      const markdown = new vscode.MarkdownString();
-      markdown.appendText(`Link URL: ${targetUrl}`);
-      if (!singleClickEnabled) {
-        markdown.appendMarkdown(
-          "\n\n*Direct click disabled (enable in settings).*",
-        );
-      }
-      const hoverRange = new vscode.Range(
-        document.positionAt(start),
-        document.positionAt(end),
-      );
-      return new vscode.Hover(markdown, hoverRange);
+    const decoration = findDecorationAtOffset(
+      decorations,
+      text,
+      hoverOffset,
+      document,
+      isLinkLikeDecoration
+    );
+    if (!decoration) {
+      return;
     }
 
-    return;
+    const target = resolveInteractionTarget(decoration, document.uri);
+    if (!target) {
+      return;
+    }
+
+    const markdown = new vscode.MarkdownString();
+    markdown.appendText(`Link URL: ${getInteractionDisplayValue(decoration, target)}`);
+    if (!singleClickEnabled) {
+      markdown.appendMarkdown(
+        "\n\n*Direct click disabled (enable in settings).*",
+      );
+    }
+
+    return new vscode.Hover(
+      markdown,
+      createDecorationRange(document, decoration, text)
+    );
   }
 }

@@ -30,6 +30,28 @@ describe('diff-context', () => {
     it('detects "compare" in URI path string', () => {
       expect(isDiffLikeUri(Uri.parse('file:///compare/files.md') as any)).toBe(true);
     });
+
+    it('detects diff-like query parameters', () => {
+      const uri = {
+        scheme: 'file',
+        query: 'path=/tmp/file.md&mode=compare',
+        fragment: '',
+        toString: () => 'file:///tmp/file.md?path=/tmp/file.md&mode=compare',
+      };
+
+      expect(isDiffLikeUri(uri as any)).toBe(true);
+    });
+
+    it('detects diff-like fragments', () => {
+      const uri = {
+        scheme: 'file',
+        query: '',
+        fragment: 'merge-view',
+        toString: () => 'file:///tmp/file.md#merge-view',
+      };
+
+      expect(isDiffLikeUri(uri as any)).toBe(true);
+    });
   });
 
   describe('isDiffViewVisible', () => {

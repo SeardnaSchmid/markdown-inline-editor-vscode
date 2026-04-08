@@ -11,17 +11,23 @@ export default defineConfig(
       '@typescript-eslint/naming-convention': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [
-        'warn',
+        'error',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
         },
       ],
-      '@typescript-eslint/no-var-requires': 'warn',
+      '@typescript-eslint/no-var-requires': 'error',
       '@typescript-eslint/no-require-imports': 'off', // Allow require() for CommonJS compatibility
       curly: 'off',
-      eqeqeq: 'warn',
-      'no-throw-literal': 'warn',
+      eqeqeq: 'error',
+      'no-throw-literal': 'error',
+    },
+  },
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      'no-console': 'error',
     },
   },
   {
@@ -58,6 +64,7 @@ export default defineConfig(
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+      'no-console': 'off',
     },
   },
   // Node.js scripts directory - allow CommonJS and Node.js globals
@@ -81,7 +88,7 @@ export default defineConfig(
     rules: {
       '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+      'no-console': 'off',
     },
   }
 );
-

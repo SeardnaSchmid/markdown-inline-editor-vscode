@@ -46,10 +46,8 @@ describe('Decorator - Mermaid diagrams', () => {
     const decorator = new Decorator(new MarkdownParseCache({} as any));
 
     (decorator as any).activeEditor = editor;
-    // Return false = cursor is NOT inside the block, so rendering should happen
-    (decorator as any).isSelectionOrCursorInsideOffsets = jest.fn().mockReturnValue(false);
     const applyMock = jest.fn();
-    (decorator as any).mermaidDecorations = {
+    (decorator as any).mermaidCoordinator.mermaidDecorations = {
       apply: applyMock,
       clear: jest.fn(),
     };
@@ -70,10 +68,8 @@ describe('Decorator - Mermaid diagrams', () => {
     const decorator = new Decorator(new MarkdownParseCache({} as any));
 
     (decorator as any).activeEditor = editor;
-    // Return true = cursor IS inside the block, so rendering should be skipped
-    (decorator as any).isSelectionOrCursorInsideOffsets = jest.fn().mockReturnValue(true);
     const applyMock = jest.fn();
-    (decorator as any).mermaidDecorations = {
+    (decorator as any).mermaidCoordinator.mermaidDecorations = {
       apply: applyMock,
       clear: jest.fn(),
     };
@@ -95,9 +91,8 @@ describe('Decorator - Mermaid diagrams', () => {
     const decorator = new Decorator(new MarkdownParseCache({} as any));
 
     (decorator as any).activeEditor = editor;
-    (decorator as any).isSelectionOrCursorInsideOffsets = jest.fn().mockReturnValue(false);
     const applyMock = jest.fn();
-    (decorator as any).mermaidDecorations = {
+    (decorator as any).mermaidCoordinator.mermaidDecorations = {
       apply: applyMock,
       clear: jest.fn(),
     };

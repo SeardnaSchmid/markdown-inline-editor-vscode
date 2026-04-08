@@ -9,6 +9,7 @@ import {
   Selection,
   workspace,
   commands,
+  window,
 } from "../../test/__mocks__/vscode";
 
 // Mock workspace.getConfiguration
@@ -343,12 +344,12 @@ describe("LinkClickHandler", () => {
       const position = new Position(0, 3);
 
       mockExecuteCommand.mockRejectedValueOnce(new Error("File not found"));
-      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
       await (handler as any).handleClick(editor, position);
 
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(window.createOutputChannel).toHaveBeenCalledTimes(1);
+      const channel = (window.createOutputChannel as jest.Mock).mock.results[0].value;
+      expect(channel.appendLine).toHaveBeenCalledWith(expect.stringContaining('[warn] Failed to open link'));
     });
   });
 

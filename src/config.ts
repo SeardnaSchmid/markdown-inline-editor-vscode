@@ -79,6 +79,18 @@ export const config = {
         .get<boolean>('mentions.enabled', true);
     },
   },
+  debug: {
+    loggingEnabled(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('debug.logging.enabled', false);
+    },
+    performanceEnabled(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('debug.performance.enabled', false);
+    },
+  },
   colors: {
     heading1(): string | undefined {
       return getColorConfig('heading1');
