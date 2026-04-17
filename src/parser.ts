@@ -45,6 +45,8 @@ export interface DecorationRange {
   slug?: string; // For type 'mention': segment after @ (e.g. username, org/team). Used by link provider to resolve URL. 
   issueNumber?: number; // For type 'issueReference': issue/PR number. Used by link provider to resolve URL.
   ownerRepo?: string; // For type 'issueReference' when repo-scoped (@user/repo#456): the "user/repo" part.
+  /** For `headingNest`: indent depth in steps (0 = none). */
+  nestSteps?: number;
 }
 
 /**
@@ -133,7 +135,8 @@ export type DecorationType =
   | "tableSeparatorDash"
   | "tableCell"
   | "mention"
-  | "issueReference";
+  | "issueReference"
+  | "headingNest";
 
 /**
  * Type for the unified processor used to parse markdown text to a Root AST node.
@@ -242,6 +245,8 @@ export class MarkdownParser {
 
       // Process AST nodes and extract decorations + scopes
       this.processAST(ast, normalizedText, decorations, scopes, mermaidBlocks);
+
+      this.addHeadingNestDecorations(normalizedText, ast, decorations, scopes);
 
       // Handle edge cases: empty image alt text that remark doesn't parse as Image node
       this.handleEmptyImageAlt(normalizedText, decorations);
@@ -877,6 +882,147 @@ export class MarkdownParser {
     }
 
     this.addScope(scopes, start, contentEnd, "heading");
+  }
+
+  /**
+   * Offsets for a 0-based line index (end is exclusive, excludes newline).
+   */
+  private lineOffsets(text: string, lineIndex0: number): { start: number; end: number } {
+    let start = 0;
+    for (let i = 0; i < lineIndex0; i++) {
+      const n = text.indexOf("\n", start);
+      if (n === -1) {
+        return { start: text.length, end: text.length };
+      }
+      start = n + 1;
+    }
+    const n = text.indexOf("\n", start);
+    const end = n === -1 ? text.length : n;
+    return { start, end };
+  }
+
+  private lineIntersectsExcludedNestContext(
+    lineStart: number,
+    lineEnd: number,
+    scopes: ScopeRange[],
+  ): boolean {
+    for (const s of scopes) {
+      if (s.kind !== "codeBlock" && s.kind !== "frontmatter") {
+        continue;
+      }
+      if (lineStart < s.endPos && lineEnd > s.startPos) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Adds visual indent (and optional guide) for headings and, when enabled,
+   * for body lines under each heading until the next heading of equal or higher level.
+   */
+  private addHeadingNestDecorations(
+    text: string,
+    ast: Root,
+    decorations: DecorationRange[],
+    scopes: ScopeRange[],
+  ): void {
+    if (!config.headings.nest.enabled()) {
+      return;
+    }
+
+    const maxLevel = config.headings.nest.maxLevel();
+    const nestContent = config.headings.nest.nestContent();
+    const maxLineIndex = Math.max(0, text.split("\n").length - 1);
+
+    const headings: Array<{ line: number; level: number }> = [];
+    const ancestorMap = new Map<Node, Node[]>();
+
+    this.visit(
+      ast,
+      (node: Node, index: number | undefined, parent: Node | undefined) => {
+        const currentAncestors: Node[] = [];
+        if (parent) {
+          currentAncestors.push(parent);
+          const parentAncestors = ancestorMap.get(parent);
+          if (parentAncestors) {
+            currentAncestors.push(...parentAncestors);
+          }
+        }
+        if (currentAncestors.length > 0) {
+          ancestorMap.set(node, currentAncestors);
+        }
+
+        if (node.type !== "heading") {
+          return;
+        }
+        const h = node as Heading;
+        if (!this.hasValidPosition(h) || this.isInCodeBlock(currentAncestors)) {
+          return;
+        }
+        const line = h.position!.start.line - 1;
+        const depth = h.depth ?? 1;
+        const level = Math.min(Math.max(depth, 1), 6);
+        headings.push({ line, level });
+      },
+    );
+
+    const pushNestLine = (line: number, nestSteps: number): void => {
+      if (nestSteps <= 0) {
+        return;
+      }
+      const { start, end } = this.lineOffsets(text, line);
+      if (start >= end) {
+        return;
+      }
+      if (this.lineIntersectsExcludedNestContext(start, end, scopes)) {
+        return;
+      }
+      decorations.push({
+        startPos: start,
+        endPos: end,
+        type: "headingNest",
+        nestSteps,
+      });
+    };
+
+    const cappedSteps = (level: number): number => {
+      const capped = Math.min(level, maxLevel);
+      return Math.max(0, capped - 1);
+    };
+
+    const headingLineSet = new Set(headings.map((h) => h.line));
+
+    for (let i = 0; i < headings.length; i++) {
+      const { line: hLine, level } = headings[i];
+      const steps = cappedSteps(level);
+      pushNestLine(hLine, steps);
+
+      if (!nestContent) {
+        continue;
+      }
+
+      let sectionEndLine: number;
+      if (i + 1 >= headings.length) {
+        sectionEndLine = maxLineIndex;
+      } else {
+        let endBefore = maxLineIndex;
+        for (let j = i + 1; j < headings.length; j++) {
+          if (headings[j].level <= level) {
+            endBefore = headings[j].line - 1;
+            break;
+          }
+        }
+        sectionEndLine = endBefore;
+      }
+
+      for (let line = hLine + 1; line <= sectionEndLine; line++) {
+        if (headingLineSet.has(line)) {
+          continue;
+        }
+        pushNestLine(line, steps);
+      }
+    }
   }
 
   /**

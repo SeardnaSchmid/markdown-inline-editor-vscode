@@ -111,6 +111,40 @@
           "description": "Opacity for code block language identifiers",
           "markdownDescription": "Opacity of code block language identifiers (0.0-1.0)."
         },
+        "markdownInlineEditor.headings.nest.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Visually indent headings (and optional body) by heading level",
+          "markdownDescription": "When enabled, headings nest like an outline: each level is indented slightly. Optional vertical line uses the theme's indent-guide color. Does not change the file contents."
+        },
+        "markdownInlineEditor.headings.nest.indentPerLevelCh": {
+          "type": "number",
+          "default": 1.25,
+          "minimum": 0,
+          "maximum": 6,
+          "description": "Indentation per heading level, in ch units",
+          "markdownDescription": "Horizontal indent per heading level, in `ch` units (one character width). Use small values (for example 1–2) so nesting stays subtle."
+        },
+        "markdownInlineEditor.headings.nest.nestContent": {
+          "type": "boolean",
+          "default": true,
+          "description": "Indent body text under each heading until the next same-or-higher-level heading",
+          "markdownDescription": "When enabled, lines between a heading and the next heading of equal or higher level are indented to match that heading. Code blocks and frontmatter are excluded."
+        },
+        "markdownInlineEditor.headings.nest.showIndentGuides": {
+          "type": "boolean",
+          "default": false,
+          "description": "Draw a subtle vertical line at the indent (theme indent-guide color)",
+          "markdownDescription": "Draw a subtle vertical line at the left of the gutter (`box-shadow` + indent-guide CSS variable). Off by default."
+        },
+        "markdownInlineEditor.headings.nest.maxLevel": {
+          "type": "integer",
+          "default": 6,
+          "minimum": 1,
+          "maximum": 6,
+          "description": "Maximum heading depth that increases indent",
+          "markdownDescription": "Headings deeper than this use the same indent as this level (for example set to 4 to cap nesting at `####`)."
+        },
         "markdownInlineEditor.links.singleClickOpen": {
           "type": "boolean",
           "default": false,

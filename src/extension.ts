@@ -249,6 +249,11 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
       decorator.recreateColorDependentTypes();
     }
 
+    if (event.affectsConfiguration('markdownInlineEditor.headings.nest')) {
+      parseCache.clear();
+      decorator.updateDecorationsForSelection();
+    }
+
     if (event.affectsConfiguration('editor.fontSize') || event.affectsConfiguration('editor.lineHeight')) {
       decorator.clearMathDecorationCache();
     }

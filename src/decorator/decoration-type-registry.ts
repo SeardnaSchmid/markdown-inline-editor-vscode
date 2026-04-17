@@ -12,6 +12,7 @@ import {
   CodeBlockLanguageDecorationType,
   SelectionOverlayDecorationType,
   HeadingDecorationType,
+  HeadingNestDecorationType,
   Heading1DecorationType,
   Heading2DecorationType,
   Heading3DecorationType,
@@ -72,6 +73,7 @@ export class DecorationTypeRegistry {
   private codeBlockLanguageDecorationType!: TextEditorDecorationType;
   private selectionOverlayDecorationType!: TextEditorDecorationType;
   private headingDecorationType!: TextEditorDecorationType;
+  private headingNestDecorationType!: TextEditorDecorationType;
   private heading1DecorationType!: TextEditorDecorationType;
   private heading2DecorationType!: TextEditorDecorationType;
   private heading3DecorationType!: TextEditorDecorationType;
@@ -111,6 +113,7 @@ export class DecorationTypeRegistry {
     this.codeBlockLanguageDecorationType = CodeBlockLanguageDecorationType(this.options.getCodeBlockLanguageOpacity());
     this.selectionOverlayDecorationType = SelectionOverlayDecorationType();
     this.headingDecorationType = HeadingDecorationType();
+    this.headingNestDecorationType = HeadingNestDecorationType();
     this.heading1DecorationType = Heading1DecorationType(this.options.getHeading1Color?.());
     this.heading2DecorationType = Heading2DecorationType(this.options.getHeading2Color?.());
     this.heading3DecorationType = Heading3DecorationType(this.options.getHeading3Color?.());
@@ -146,6 +149,7 @@ export class DecorationTypeRegistry {
       ['codeBlock', this.codeBlockDecorationType],
       ['codeBlockLanguage', this.codeBlockLanguageDecorationType],
       ['heading', this.headingDecorationType],
+      ['headingNest', this.headingNestDecorationType],
       ['heading1', this.heading1DecorationType],
       ['heading2', this.heading2DecorationType],
       ['heading3', this.heading3DecorationType],
