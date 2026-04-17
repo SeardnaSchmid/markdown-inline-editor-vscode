@@ -5,7 +5,7 @@ import { mapNormalizedToOriginal } from './position-mapping';
 import { config } from './config';
 import { isDiffLikeUri, isDiffViewVisible } from './diff-context';
 import { MarkdownParseCache } from './markdown-parse-cache';
-import { DecorationTypeRegistry } from './decorator/decoration-type-registry';
+import { DecorationStyleDebugSpec, DecorationTypeRegistry } from './decorator/decoration-type-registry';
 import { filterDecorationsForEditor, ScopeEntry } from './decorator/visibility-model';
 import { handleCheckboxClick } from './decorator/checkbox-toggle';
 import { MermaidDiagramDecorations } from './decorator/mermaid-diagram-decorations';
@@ -27,6 +27,41 @@ const PERFORMANCE_CONSTANTS = {
   /** Max Mermaid renders in flight (bounded parallelism) */
   MERMAID_MAX_CONCURRENCY: 4,
 } as const;
+
+type DebugDecorationType = DecorationType | 'ghostFaint';
+
+type DebugRenderOptionsSnapshot = {
+  beforeContentText?: string;
+  beforeTextDecoration?: string;
+  beforeFontWeight?: string;
+  beforeFontStyle?: string;
+  afterContentText?: string;
+  afterTextDecoration?: string;
+};
+
+type DebugAppliedRangeSnapshot = {
+  startLine: number;
+  startCharacter: number;
+  endLine: number;
+  endCharacter: number;
+  renderOptions?: DebugRenderOptionsSnapshot;
+};
+
+export type DecoratorDebugSnapshot = {
+  documentUri?: string;
+  enabled: boolean;
+  applied: Partial<Record<DebugDecorationType, DebugAppliedRangeSnapshot[]>>;
+  styles: Partial<Record<DebugDecorationType, DecorationStyleDebugSpec>>;
+  math?: {
+    enabled: boolean;
+    applied: DebugAppliedRangeSnapshot[];
+    hiddenCount: number;
+  };
+  mermaid?: {
+    rendered: DebugAppliedRangeSnapshot[];
+    indicators: DebugAppliedRangeSnapshot[];
+  };
+};
 
 type MermaidBlockKeyCacheEntry = {
   theme: 'default' | 'dark';
@@ -107,6 +142,20 @@ export class Decorator {
    * Undefined in production; never called when decorations are disabled.
    */
   onApply: ((nonEmptyTypeCount: number) => void) | undefined = undefined;
+  private lastDebugSnapshot: DecoratorDebugSnapshot = {
+    enabled: true,
+    applied: {},
+    styles: {},
+    math: {
+      enabled: true,
+      applied: [],
+      hiddenCount: 0,
+    },
+    mermaid: {
+      rendered: [],
+      indicators: [],
+    },
+  };
 
   private parseCache: MarkdownParseCache;
   private updateTimeout: NodeJS.Timeout | undefined;
@@ -318,6 +367,32 @@ export class Decorator {
   }
 
   /**
+   * Returns the latest debug snapshot of what the decorator applied to the active editor.
+   * Intended for E2E tests only.
+   */
+  getDebugSnapshot(): DecoratorDebugSnapshot {
+    return {
+      documentUri: this.lastDebugSnapshot.documentUri,
+      enabled: this.lastDebugSnapshot.enabled,
+      applied: { ...this.lastDebugSnapshot.applied },
+      styles: { ...this.lastDebugSnapshot.styles },
+      math: this.lastDebugSnapshot.math
+        ? {
+            enabled: this.lastDebugSnapshot.math.enabled,
+            applied: [...this.lastDebugSnapshot.math.applied],
+            hiddenCount: this.lastDebugSnapshot.math.hiddenCount,
+          }
+        : undefined,
+      mermaid: this.lastDebugSnapshot.mermaid
+        ? {
+            rendered: [...this.lastDebugSnapshot.mermaid.rendered],
+            indicators: [...this.lastDebugSnapshot.mermaid.indicators],
+          }
+        : undefined,
+    };
+  }
+
+  /**
    * Get the enabled state for a specific file URI, loading from persisted
    * state on first access.
    *
@@ -387,6 +462,21 @@ export class Decorator {
     this.mermaidDecorations.clear(this.activeEditor);
     this.mathDecorations.clear(this.activeEditor);
     this.activeEditor.setDecorations(this.mermaidHoverIndicatorDecorationType, []);
+    this.lastDebugSnapshot = {
+      documentUri: this.activeEditor.document.uri.toString(),
+      enabled: this.isEnabled(),
+      applied: {},
+      styles: this.buildDebugStylesSnapshot(),
+      math: {
+        enabled: this.lastDebugSnapshot.math?.enabled ?? true,
+        applied: [],
+        hiddenCount: 0,
+      },
+      mermaid: {
+        rendered: [],
+        indicators: [],
+      },
+    };
   }
 
   /**
@@ -436,6 +526,11 @@ export class Decorator {
       if (this.activeEditor) {
         this.mathDecorations.clear(this.activeEditor);
       }
+      this.lastDebugSnapshot.math = {
+        enabled: config.math.enabled(),
+        applied: [],
+        hiddenCount: 0,
+      };
     }
     void this.updateMermaidDiagrams(mermaidBlocks, text, document.version);
   }
@@ -461,6 +556,13 @@ export class Decorator {
       };
     });
     this.mathDecorations.apply(editor, regionsWithRanges);
+    this.lastDebugSnapshot.math = {
+      enabled: true,
+      applied: regionsWithRanges
+        .filter((entry) => entry.range)
+        .map((entry) => this.toDebugAppliedRangeSnapshot(entry.range as Range)),
+      hiddenCount: regionsWithRanges.filter((entry) => entry.range === null).length,
+    };
   }
 
   /**
@@ -546,6 +648,10 @@ export class Decorator {
     if (mermaidBlocks.length === 0) {
       this.mermaidDecorations.clear(editor);
       editor.setDecorations(this.mermaidHoverIndicatorDecorationType, []);
+      this.lastDebugSnapshot.mermaid = {
+        rendered: [],
+        indicators: [],
+      };
       return;
     }
 
@@ -662,6 +768,10 @@ export class Decorator {
     
     // Apply hover indicator decorations
     editor.setDecorations(this.mermaidHoverIndicatorDecorationType, indicatorRanges);
+    this.lastDebugSnapshot.mermaid = {
+      rendered: [...rangesByKey.values()].flat().map((range) => this.toDebugAppliedRangeSnapshot(range)),
+      indicators: indicatorRanges.map((range) => this.toDebugAppliedRangeSnapshot(range)),
+    };
   }
 
   private isSelectionOrCursorInsideOffsets(
@@ -775,6 +885,17 @@ export class Decorator {
 
     const ghostFaintRanges = (filteredDecorations.get('ghostFaint') as Range[] | undefined) || [];
     this.activeEditor.setDecorations(this.decorationTypes.getGhostFaintDecorationType(), ghostFaintRanges);
+
+    const snapshotDecorations = new Map(filteredDecorations);
+    if (!config.emojis.enabled()) {
+      snapshotDecorations.delete('emoji');
+    }
+    this.lastDebugSnapshot = {
+      documentUri: this.activeEditor.document.uri.toString(),
+      enabled: this.isEnabled(),
+      applied: this.buildAppliedDebugSnapshot(snapshotDecorations, ghostFaintRanges),
+      styles: this.buildDebugStylesSnapshot(),
+    };
 
     // Fire optional test hook (E2E only — undefined in production).
     if (this.onApply) {
@@ -991,4 +1112,56 @@ export class Decorator {
     }
   }
 
+  private buildAppliedDebugSnapshot(
+    filteredDecorations: Map<DecorationType, Array<Range | DecorationOptions>>,
+    ghostFaintRanges: Range[]
+  ): Partial<Record<DebugDecorationType, DebugAppliedRangeSnapshot[]>> {
+    const applied: Partial<Record<DebugDecorationType, DebugAppliedRangeSnapshot[]>> = {};
+
+    for (const [type, entries] of filteredDecorations.entries()) {
+      if (entries.length === 0) {
+        continue;
+      }
+      applied[type] = entries.map((entry) => this.toDebugAppliedRangeSnapshot(entry));
+    }
+
+    if (ghostFaintRanges.length > 0) {
+      applied.ghostFaint = ghostFaintRanges.map((entry) => this.toDebugAppliedRangeSnapshot(entry));
+    }
+
+    return applied;
+  }
+
+  private buildDebugStylesSnapshot(): Partial<Record<DebugDecorationType, DecorationStyleDebugSpec>> {
+    const styles: Partial<Record<DebugDecorationType, DecorationStyleDebugSpec>> = {};
+
+    for (const [type, spec] of this.decorationTypes.getDebugStyleMap().entries()) {
+      styles[type] = spec;
+    }
+
+    return styles;
+  }
+
+  private toDebugAppliedRangeSnapshot(entry: Range | DecorationOptions): DebugAppliedRangeSnapshot {
+    const range = entry instanceof Range ? entry : entry.range;
+    const snapshot: DebugAppliedRangeSnapshot = {
+      startLine: range.start.line,
+      startCharacter: range.start.character,
+      endLine: range.end.line,
+      endCharacter: range.end.character,
+    };
+
+    if (!(entry instanceof Range) && entry.renderOptions) {
+      snapshot.renderOptions = {
+        beforeContentText: entry.renderOptions.before?.contentText,
+        beforeTextDecoration: entry.renderOptions.before?.textDecoration,
+        beforeFontWeight: entry.renderOptions.before?.fontWeight,
+        beforeFontStyle: entry.renderOptions.before?.fontStyle,
+        afterContentText: entry.renderOptions.after?.contentText,
+        afterTextDecoration: entry.renderOptions.after?.textDecoration,
+      };
+    }
+
+    return snapshot;
+  }
 }
