@@ -27,12 +27,23 @@ function simpleRangeFactory(startPos: number, endPos: number, text: string) {
   return new Range(doc.positionAt(startPos), doc.positionAt(endPos)) as any;
 }
 
+/** Filtered table/emoji entries use `renderOptions.before` (not plain `Range`). */
+function beforeAttachment(
+  item: unknown,
+): { contentText?: string; width?: string; fontWeight?: string } | undefined {
+  if (!item || typeof item !== 'object' || !('renderOptions' in item)) {
+    return undefined;
+  }
+  const ro = (item as { renderOptions?: { before?: Record<string, unknown> } }).renderOptions;
+  return ro?.before as { contentText?: string; width?: string; fontWeight?: string } | undefined;
+}
+
 describe('emoji decoration', () => {
   it('renders emoji replacement when cursor is not on the emoji line', () => {
     const text = ':smile:\nother line';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 7, type: 'emoji', emoji: '😊' } as any,
-    ];
+    const decs = [
+      { startPos: 0, endPos: 7, type: 'emoji' as const, emoji: '😊' },
+    ] satisfies DecorationRange[];
     const editor = makeEditor(text, 1, 0); // cursor on line 1, not line 0
     const result = filterDecorationsForEditor(
       editor as any,
@@ -41,17 +52,17 @@ describe('emoji decoration', () => {
       text,
       (s, e, t) => simpleRangeFactory(s, e, t),
     );
-    const emojis = result.get('emoji') as any[];
+    const emojis = result.get('emoji');
     expect(emojis).toBeDefined();
-    expect(emojis.length).toBe(1);
-    expect((emojis[0] as any).renderOptions?.before?.contentText).toBe('😊');
+    expect(emojis!.length).toBe(1);
+    expect(beforeAttachment(emojis![0])?.contentText).toBe('😊');
   });
 
   it('skips emoji when cursor is inside the emoji scope (raw reveal)', () => {
     const text = ':smile:';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 7, type: 'emoji', emoji: '😊' } as any,
-    ];
+    const decs = [
+      { startPos: 0, endPos: 7, type: 'emoji' as const, emoji: '😊' },
+    ] satisfies DecorationRange[];
     const doc = new TextDocument(Uri.file('test.md'), 'markdown', 1, text);
     const scope: ScopeEntry = {
       startPos: 0,
@@ -71,9 +82,7 @@ describe('emoji decoration', () => {
 
   it('does not render emoji without emoji property', () => {
     const text = ':smile:\nother';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 7, type: 'emoji' } as any,
-    ];
+    const decs = [{ startPos: 0, endPos: 7, type: 'emoji' as const }] satisfies DecorationRange[];
     const editor = makeEditor(text, 1, 0);
     const result = filterDecorationsForEditor(
       editor as any,
@@ -89,9 +98,9 @@ describe('emoji decoration', () => {
 describe('table decoration rendering', () => {
   it('renders tablePipe with replacement text when cursor is off the table', () => {
     const text = '| A |\n| - |\nother';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 1, type: 'tablePipe', replacement: '│' } as any,
-    ];
+    const decs = [
+      { startPos: 0, endPos: 1, type: 'tablePipe' as const, replacement: '│' },
+    ] satisfies DecorationRange[];
     const editor = makeEditor(text, 2, 0); // cursor below table on line 2
     const result = filterDecorationsForEditor(
       editor as any,
@@ -100,16 +109,39 @@ describe('table decoration rendering', () => {
       text,
       (s, e, t) => simpleRangeFactory(s, e, t),
     );
-    const pipes = result.get('tablePipe') as any[];
+    const pipes = result.get('tablePipe');
     expect(pipes).toBeDefined();
-    expect(pipes[0].renderOptions?.before?.contentText).toBe('│');
+    expect(beforeAttachment(pipes![0])?.contentText).toBe('│');
+  });
+
+  it('prepends replacementPrefix to tablePipe before content', () => {
+    const text = '| x |\nother';
+    const decs = [
+      {
+        startPos: 4,
+        endPos: 5,
+        type: 'tablePipe' as const,
+        replacement: '│',
+        replacementPrefix: '\u00A0\u00A0',
+      },
+    ] satisfies DecorationRange[];
+    const editor = makeEditor(text, 2, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const pipes = result.get('tablePipe');
+    expect(beforeAttachment(pipes![0])?.contentText).toBe('\u00A0\u00A0│');
   });
 
   it('skips table decorations when cursor is on the table (whole-block reveal)', () => {
     const text = '| A |\n| - |';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 1, type: 'tablePipe', replacement: '│' } as any,
-    ];
+    const decs = [
+      { startPos: 0, endPos: 1, type: 'tablePipe' as const, replacement: '│' },
+    ] satisfies DecorationRange[];
     const doc = new TextDocument(Uri.file('test.md'), 'markdown', 1, text);
     const tableScope: ScopeEntry = {
       startPos: 0,
@@ -130,15 +162,15 @@ describe('table decoration rendering', () => {
 
   it('renders tableCell with cellStyle properties', () => {
     const text = '| **bold** |\nother';
-    const decs: DecorationRange[] = [
+    const decs = [
       {
         startPos: 0,
         endPos: 1,
-        type: 'tableCell',
+        type: 'tableCell' as const,
         replacement: ' bold ',
         cellStyle: { fontWeight: 'bold', fontStyle: 'normal', textDecoration: 'none' },
-      } as any,
-    ];
+      },
+    ] satisfies DecorationRange[];
     const editor = makeEditor(text, 1, 0);
     const result = filterDecorationsForEditor(
       editor as any,
@@ -147,10 +179,83 @@ describe('table decoration rendering', () => {
       text,
       (s, e, t) => simpleRangeFactory(s, e, t),
     );
-    const cells = result.get('tableCell') as any[];
+    const cells = result.get('tableCell');
     expect(cells).toBeDefined();
-    expect(cells[0].renderOptions?.before?.contentText).toBe(' bold ');
-    expect(cells[0].renderOptions?.before?.fontWeight).toBe('bold');
+    const before = beforeAttachment(cells![0]);
+    expect(before?.contentText).toBe(' bold ');
+    expect(before?.fontWeight).toBe('bold');
+  });
+
+  it('sets width in ch on tableCell before attachment when tableCellWidthCh is set', () => {
+    const text = '| x |\nother';
+    const decs = [
+      {
+        startPos: 1,
+        endPos: 4,
+        type: 'tableCell' as const,
+        replacement: '\u00A0x\u00A0\u00A0',
+        tableCellWidthCh: 7,
+      },
+    ] satisfies DecorationRange[];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const cells = result.get('tableCell');
+    expect(beforeAttachment(cells![0])?.width).toBe('7ch');
+  });
+
+  it('does not set before.width on tableCell when tableCellWidthCh is omitted', () => {
+    const text = '| x |\nother';
+    const decs = [
+      {
+        startPos: 1,
+        endPos: 4,
+        type: 'tableCell' as const,
+        replacement: '\u00A0x\u00A0\u00A0',
+      },
+    ] satisfies DecorationRange[];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const cells = result.get('tableCell');
+    expect(beforeAttachment(cells![0])?.width).toBeUndefined();
+  });
+
+  it('skips tableCellNativePad when cursor is on the table', () => {
+    const text = '| A |\n| - |';
+    const decs = [
+      {
+        startPos: 5,
+        endPos: 5,
+        type: 'tableCellNativePad' as const,
+        replacement: '\u00A0\u00A0',
+      },
+    ] satisfies DecorationRange[];
+    const tableScope: ScopeEntry = {
+      startPos: 0,
+      endPos: 11,
+      range: new Range(new Position(0, 0), new Position(1, 5)) as any,
+      kind: 'table',
+    };
+    const editor = makeEditor(text, 0, 2);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [tableScope],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    expect(result.has('tableCellNativePad')).toBe(false);
   });
 });
 
@@ -223,9 +328,7 @@ describe('headingNest', () => {
 describe('selection overlay for codeBlock/frontmatter', () => {
   it('adds selectionOverlay when non-empty selection covers a codeBlock', () => {
     const text = '```\ncode\n```';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 12, type: 'codeBlock' } as any,
-    ];
+    const decs = [{ startPos: 0, endPos: 12, type: 'codeBlock' as const }] satisfies DecorationRange[];
     const editor = makeEditorWithSelection(text, 0, 0, 2, 3); // non-empty selection
     const result = filterDecorationsForEditor(
       editor as any,
@@ -239,9 +342,7 @@ describe('selection overlay for codeBlock/frontmatter', () => {
 
   it('adds selectionOverlay when selection covers frontmatter', () => {
     const text = '---\ntitle: hi\n---';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 17, type: 'frontmatter' } as any,
-    ];
+    const decs = [{ startPos: 0, endPos: 17, type: 'frontmatter' as const }] satisfies DecorationRange[];
     const editor = makeEditorWithSelection(text, 0, 0, 1, 5); // non-empty selection
     const result = filterDecorationsForEditor(
       editor as any,
@@ -255,9 +356,7 @@ describe('selection overlay for codeBlock/frontmatter', () => {
 
   it('does not add selectionOverlay when there is no selection (cursor only)', () => {
     const text = '```\ncode\n```';
-    const decs: DecorationRange[] = [
-      { startPos: 0, endPos: 12, type: 'codeBlock' } as any,
-    ];
+    const decs = [{ startPos: 0, endPos: 12, type: 'codeBlock' as const }] satisfies DecorationRange[];
     const editor = makeEditor(text, 1, 2); // cursor-only (isEmpty)
     const result = filterDecorationsForEditor(
       editor as any,
@@ -391,11 +490,11 @@ describe('filterDecorationsForEditor — basic cases', () => {
 
   it('applies non-marker semantic decorations on non-active lines', () => {
     const text = 'hello\n**bold**';
-    const decs: DecorationRange[] = [
-      { startPos: 6, endPos: 8, type: 'hide' } as any,
-      { startPos: 8, endPos: 12, type: 'bold' } as any,
-      { startPos: 12, endPos: 14, type: 'hide' } as any,
-    ];
+    const decs = [
+      { startPos: 6, endPos: 8, type: 'hide' as const },
+      { startPos: 8, endPos: 12, type: 'bold' as const },
+      { startPos: 12, endPos: 14, type: 'hide' as const },
+    ] satisfies DecorationRange[];
     const editor = makeEditor(text, 0, 0); // cursor on line 0, decoration on line 1
     const result = filterDecorationsForEditor(
       editor as any,

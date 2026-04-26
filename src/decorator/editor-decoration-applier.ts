@@ -75,6 +75,7 @@ export function applyFilteredDecorations(
 ): void {
   const renderOptionsTypes = new Set<DecorationType>([
     'emoji', 'orderedListItem', 'headingNest', 'tablePipe', 'tableSeparatorPipe', 'tableSeparatorDash', 'tableCell',
+    'tableCellNativePad',
   ]);
 
   for (const [type, decorationType] of decorationTypes.getMap().entries()) {

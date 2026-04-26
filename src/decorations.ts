@@ -633,6 +633,24 @@ export function TableCellDecorationType() {
 }
 
 /**
+ * NBSP leading padding for table cells that keep the source visible
+ * (syntax highlighting, links, inline code). Trailing pad is merged into the
+ * closing `tablePipe` decoration (`replacementPrefix` + │).
+ *
+ * Intentionally omits `textDecoration: 'none; display: none;'` used on
+ * {@link TableCellDecorationType}: the underlying cell range must stay visible
+ * so TextMate and inline decorations apply; hiding it would break native cells.
+ */
+export function TableCellNativePadDecorationType() {
+  return window.createTextEditorDecorationType({
+    before: {
+      contentText: '',
+      color: new ThemeColor('editor.foreground'),
+    },
+  });
+}
+
+/**
  * Creates a decoration type for mermaid hover indicator.
  *
  * Adds a small visual indicator (⧉) at the start of mermaid code blocks

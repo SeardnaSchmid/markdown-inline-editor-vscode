@@ -6,11 +6,13 @@ export interface DecorationRange {
   level?: number;
   emoji?: string;
   replacement?: string;
+  replacementPrefix?: string;
   cellStyle?: {
     fontWeight?: string;
     fontStyle?: string;
     textDecoration?: string;
   };
+  tableCellWidthCh?: number;
   slug?: string;
   issueNumber?: number;
   ownerRepo?: string;
@@ -80,6 +82,7 @@ export type DecorationType =
   | "tableSeparatorPipe"
   | "tableSeparatorDash"
   | "tableCell"
+  | "tableCellNativePad"
   | "mention"
   | "issueReference"
   | "headingNest";

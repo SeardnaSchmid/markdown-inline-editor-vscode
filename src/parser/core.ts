@@ -15,6 +15,7 @@ import type {
   Text,
   Table,
   TableCell,
+  TableRow,
 } from "mdast";
 import {
   addMarkerDecorations as addMarkerDecorationsHelper,
@@ -35,12 +36,15 @@ import {
 import {
   cellHasMixedFormatting as cellHasMixedFormattingHelper,
   computeColumnWidths as computeColumnWidthsHelper,
+  countHiddenMarkerLength as countHiddenMarkerLengthHelper,
   detectCellStyle as detectCellStyleHelper,
   extractCellPlainText as extractCellPlainTextHelper,
   findPipePositions as findPipePositionsHelper,
+  getTableRowPipeLayout as getTableRowPipeLayoutHelper,
   getLineRange as getLineRangeHelper,
   measureTextWidth as measureTextWidthHelper,
   normalizePipePositions as normalizePipePositionsHelper,
+  shouldRenderTableCellNative as shouldRenderTableCellNativeHelper,
   trimLineEnd as trimLineEndHelper,
 } from "./tables";
 import {
@@ -1277,6 +1281,17 @@ export class MarkdownParser {
     return cellHasMixedFormattingHelper(cell);
   }
 
+  private countHiddenMarkerLength(cell: TableCell, source: string): number {
+    return countHiddenMarkerLengthHelper(cell, source);
+  }
+
+  private shouldRenderTableCellNative(
+    astCell: TableCell | undefined,
+    trimmedCell: string,
+  ): boolean {
+    return shouldRenderTableCellNativeHelper(astCell, trimmedCell);
+  }
+
   /**
    * Detects whole-cell formatting and returns CSS properties for the before
    * pseudo-element. Returns undefined for unformatted or mixed-format cells.
@@ -1334,6 +1349,15 @@ export class MarkdownParser {
     pipes: number[],
   ): { positions: number[]; isVirtual: boolean[] } {
     return normalizePipePositionsHelper(text, lineStart, trimmedLineEnd, pipes);
+  }
+
+  private getTableRowPipeLayout(
+    row: TableRow,
+    text: string,
+    lineStart: number,
+    trimmedLineEnd: number,
+  ): { positions: number[]; isVirtual: boolean[] } {
+    return getTableRowPipeLayoutHelper(row, text, lineStart, trimmedLineEnd);
   }
 
   /**
@@ -1415,22 +1439,14 @@ export class MarkdownParser {
       const rowStartOffset = row.position.start.offset;
       const [lineStart, lineEnd] = this.getLineRange(text, rowStartOffset);
       const trimmedLineEnd = this.trimLineEnd(text, lineStart, lineEnd);
-      const rawPipes = this.findPipePositions(text, lineStart, trimmedLineEnd);
-      const { positions: pipes, isVirtual } = this.normalizePipePositions(
-        text, lineStart, trimmedLineEnd, rawPipes,
+      const { positions: pipes, isVirtual } = this.getTableRowPipeLayout(
+        row as TableRow,
+        text,
+        lineStart,
+        trimmedLineEnd,
       );
 
-      // Only decorate real (non-virtual) pipes
-      for (let pIdx = 0; pIdx < pipes.length; pIdx++) {
-        if (!isVirtual[pIdx]) {
-          decorations.push({
-            startPos: pipes[pIdx],
-            endPos: pipes[pIdx] + 1,
-            type: "tablePipe",
-            replacement: "\u2502", // │
-          });
-        }
-      }
+      const nativeTrailBeforePipe = new Map<number, string>();
 
       // Derive cells from pipe positions (avoids remark cell positions which include pipes)
       for (let i = 0; i < pipes.length - 1; i++) {
@@ -1442,18 +1458,38 @@ export class MarkdownParser {
         const trimmedContent = rawContent.trim();
         const cellStyle = this.detectCellStyle(trimmedContent);
         const colWidth = i < colWidths.length ? colWidths[i] : 3;
+        const align = i < colAligns.length ? colAligns[i] : null;
 
-        // Whole-cell styled: extract clean text via AST + apply CSS
-        // Mixed formatting: show raw syntax (VS Code can't partially style)
-        // Plain / escaped: use AST extraction (handles \| → |, \\ → \)
         const astCell = i < row.children.length ? row.children[i] as TableCell : undefined;
+        const useNative = this.shouldRenderTableCellNative(astCell, trimmedContent);
+        if (useNative) {
+          const visibleWidth = this.measureTextWidth(rawContent.trim());
+          const totalPad = Math.max(0, colWidth - visibleWidth);
+          let leading = 1;
+          let trailing = totalPad + 1;
+          if (align === "right") {
+            leading = totalPad + 1;
+            trailing = 1;
+          } else if (align === "center") {
+            leading = Math.floor(totalPad / 2) + 1;
+            trailing = totalPad - Math.floor(totalPad / 2) + 1;
+          }
+          nativeTrailBeforePipe.set(pipes[i + 1], "\u00A0".repeat(trailing));
+          decorations.push({
+            startPos: cellRangeStart,
+            endPos: cellRangeEnd,
+            type: "tableCellNativePad",
+            replacement: "\u00A0".repeat(leading),
+          });
+          continue;
+        }
+
         const showRaw = !cellStyle && astCell && this.cellHasMixedFormatting(astCell);
         const displayContent = (astCell && !showRaw)
           ? this.extractCellPlainText(astCell)
           : trimmedContent;
         const displayWidth = this.measureTextWidth(displayContent);
         const totalPad = Math.max(0, colWidth - displayWidth);
-        const align = i < colAligns.length ? colAligns[i] : null;
 
         let replacement: string;
         if (align === "right") {
@@ -1473,7 +1509,22 @@ export class MarkdownParser {
           type: "tableCell",
           replacement,
           cellStyle,
+          tableCellWidthCh: colWidth + 2,
         });
+      }
+
+      // Only decorate real (non-virtual) pipes after cells so native trailing padding can prefix the pipe.
+      for (let pIdx = 0; pIdx < pipes.length; pIdx++) {
+        if (!isVirtual[pIdx]) {
+          const prefix = nativeTrailBeforePipe.get(pipes[pIdx]) ?? "";
+          decorations.push({
+            startPos: pipes[pIdx],
+            endPos: pipes[pIdx] + 1,
+            type: "tablePipe",
+            replacement: "\u2502", // │
+            ...(prefix !== "" ? { replacementPrefix: prefix } : {}),
+          });
+        }
       }
 
       // After the header row (index 0), process the separator row.

@@ -6,6 +6,7 @@ import type {
   Strong,
   Table,
   TableCell,
+  TableRow,
   Text,
 } from 'mdast';
 import type { ScopeRange } from './types';
@@ -39,6 +40,46 @@ export function cellHasMixedFormatting(cell: TableCell): boolean {
     child.type === 'strong' || child.type === 'emphasis' ||
     child.type === 'delete' || child.type === 'inlineCode'
   );
+}
+
+export function tableCellAstHasRichMarkdown(cell: TableCell): boolean {
+  const walk = (node: Node): boolean => {
+    if (
+      node.type === 'strong' ||
+      node.type === 'emphasis' ||
+      node.type === 'delete' ||
+      node.type === 'inlineCode' ||
+      node.type === 'link' ||
+      node.type === 'image'
+    ) {
+      return true;
+    }
+    const parent = node as { children?: Node[] };
+    return parent.children ? parent.children.some(walk) : false;
+  };
+  return cell.children.some(walk);
+}
+
+export function cellTextHasDollarMathSyntax(trimmed: string): boolean {
+  return /\$[^$\s\n][^$\n]*\$/.test(trimmed);
+}
+
+export function shouldRenderTableCellNative(
+  astCell: TableCell | undefined,
+  trimmedCell: string,
+): boolean {
+  if (!astCell) {
+    return false;
+  }
+  return tableCellAstHasRichMarkdown(astCell) || cellTextHasDollarMathSyntax(trimmedCell);
+}
+
+export function countHiddenMarkerLength(cell: TableCell, source: string): number {
+  if (!cell.position || cell.position.start.offset === undefined || cell.position.end.offset === undefined) {
+    return 0;
+  }
+  const raw = source.slice(cell.position.start.offset, cell.position.end.offset).trim();
+  return Math.max(0, measureTextWidth(raw) - measureTextWidth(extractCellPlainText(cell)));
 }
 
 export function detectCellStyle(
@@ -145,6 +186,62 @@ export function normalizePipePositions(
   return { positions, isVirtual };
 }
 
+export function getAstTablePipeOffsetsFromRow(
+  row: TableRow,
+  text: string,
+): number[] | null {
+  const cells = row.children;
+  if (cells.length === 0) {
+    return null;
+  }
+  for (const cell of cells) {
+    if (
+      !cell.position ||
+      cell.position.start.offset === undefined ||
+      cell.position.end.offset === undefined
+    ) {
+      return null;
+    }
+  }
+
+  const pipes: number[] = [];
+  for (let i = 0; i < cells.length; i++) {
+    const start = (cells[i] as TableCell).position!.start.offset!;
+    if (i === 0) {
+      if (text[start] === '|') {
+        pipes.push(start);
+      }
+    } else {
+      pipes.push(start);
+    }
+  }
+
+  const lastCell = cells[cells.length - 1] as TableCell;
+  const endOffset = lastCell.position!.end.offset!;
+  const trailingIndex = endOffset - 1;
+  if (trailingIndex >= 0 && text[trailingIndex] === '|') {
+    pipes.push(trailingIndex);
+  }
+
+  return pipes;
+}
+
+export function getTableRowPipeLayout(
+  row: TableRow,
+  text: string,
+  lineStart: number,
+  trimmedLineEnd: number,
+): { positions: number[]; isVirtual: boolean[] } {
+  const astPipes = getAstTablePipeOffsetsFromRow(row, text);
+  let rawPipes: number[];
+  if (astPipes !== null && astPipes.length > 0) {
+    rawPipes = astPipes;
+  } else {
+    rawPipes = findPipePositions(text, lineStart, trimmedLineEnd);
+  }
+  return normalizePipePositions(text, lineStart, trimmedLineEnd, rawPipes);
+}
+
 export function getLineRange(text: string, offset: number): [number, number] {
   const lineStart = offset === 0 ? 0 : text.lastIndexOf('\n', offset - 1) + 1;
   let lineEnd = text.indexOf('\n', offset);
@@ -170,8 +267,7 @@ export function computeColumnWidths(tableNode: Table, source: string): number[] 
     if (!row.position || row.position.start.offset === undefined) continue;
     const [lineStart, lineEnd] = getLineRange(source, row.position.start.offset);
     const trimmed = trimLineEnd(source, lineStart, lineEnd);
-    const rawPipes = findPipePositions(source, lineStart, trimmed);
-    const { positions: pipes } = normalizePipePositions(source, lineStart, trimmed, rawPipes);
+    const { positions: pipes } = getTableRowPipeLayout(row as TableRow, source, lineStart, trimmed);
     const cellCount = Math.max(0, pipes.length - 1);
     if (cellCount > numCols) numCols = cellCount;
   }
@@ -182,18 +278,21 @@ export function computeColumnWidths(tableNode: Table, source: string): number[] 
     if (!row.position || row.position.start.offset === undefined) continue;
     const [lineStart, lineEnd] = getLineRange(source, row.position.start.offset);
     const trimmed = trimLineEnd(source, lineStart, lineEnd);
-    const rawPipes = findPipePositions(source, lineStart, trimmed);
-    const { positions: pipes } = normalizePipePositions(source, lineStart, trimmed, rawPipes);
+    const { positions: pipes } = getTableRowPipeLayout(row as TableRow, source, lineStart, trimmed);
 
     for (let i = 0; i < pipes.length - 1 && i < numCols; i++) {
       const cellText = source.substring(pipes[i] + 1, pipes[i + 1]).trim();
       const astCell = i < row.children.length ? row.children[i] as TableCell : undefined;
       const cellStyle = detectCellStyle(cellText);
-      const showRaw = !cellStyle && astCell && cellHasMixedFormatting(astCell);
-      const displayText = (astCell && !showRaw)
-        ? extractCellPlainText(astCell)
-        : cellText;
-      const width = measureTextWidth(displayText);
+      const useNative = shouldRenderTableCellNative(astCell, cellText);
+      let width: number;
+      if (useNative) {
+        width = measureTextWidth(cellText);
+      } else {
+        const showRaw = !cellStyle && astCell && cellHasMixedFormatting(astCell);
+        const displayText = (astCell && !showRaw) ? extractCellPlainText(astCell) : cellText;
+        width = measureTextWidth(displayText);
+      }
       if (width > widths[i]) widths[i] = width;
     }
   }

@@ -1,4 +1,12 @@
-import { Range, ThemeColor, type DecorationOptions, type Position, type TextEditor } from 'vscode';
+import {
+  Range,
+  ThemeColor,
+  type DecorationOptions,
+  type Position,
+  type TextEditor,
+  type ThemableDecorationAttachmentRenderOptions,
+  type ThemableDecorationInstanceRenderOptions,
+} from 'vscode';
 import type { DecorationRange, DecorationType } from '../parser';
 import { config } from '../config';
 import { isMarkerDecorationType } from './decoration-categories';
@@ -68,6 +76,7 @@ export function filterDecorationsForEditor(
   // Table decoration types that use per-range replacement rendering
   const tableTypes = new Set<DecorationType>([
     'tablePipe', 'tableSeparatorPipe', 'tableSeparatorDash', 'tableCell',
+    'tableCellNativePad',
   ]);
 
   // For table blocks, if cursor/selection is on ANY line in the table,
@@ -240,19 +249,32 @@ export function filterDecorationsForEditor(
       }
       if (decoration.replacement !== undefined) {
         const ranges = filtered.get(decoration.type) || [];
-        const beforeOpts: Record<string, unknown> = {
-          contentText: decoration.replacement,
+        const pipePrefix =
+          decoration.type === 'tablePipe' && decoration.replacementPrefix
+            ? decoration.replacementPrefix
+            : '';
+        const beforeOpts: ThemableDecorationAttachmentRenderOptions = {
+          contentText: pipePrefix + decoration.replacement,
         };
-        if (decoration.cellStyle) {
-          if (decoration.cellStyle.fontWeight) beforeOpts.fontWeight = decoration.cellStyle.fontWeight;
-          if (decoration.cellStyle.fontStyle) beforeOpts.fontStyle = decoration.cellStyle.fontStyle;
-          if (decoration.cellStyle.textDecoration) beforeOpts.textDecoration = decoration.cellStyle.textDecoration;
+        if (decoration.type === 'tableCell') {
+          const ch = decoration.tableCellWidthCh;
+          // VS Code applies `width` on decoration `before` attachments as CSS;
+          // validated against current stable API (see tableCellWidthCh on DecorationRange).
+          if (ch !== undefined && ch > 0) {
+            beforeOpts.width = `${ch}ch`;
+          }
+          if (decoration.cellStyle) {
+            if (decoration.cellStyle.fontWeight) beforeOpts.fontWeight = decoration.cellStyle.fontWeight;
+            if (decoration.cellStyle.fontStyle) beforeOpts.fontStyle = decoration.cellStyle.fontStyle;
+            if (decoration.cellStyle.textDecoration) beforeOpts.textDecoration = decoration.cellStyle.textDecoration;
+          }
         }
+        const renderOptions: ThemableDecorationInstanceRenderOptions = {
+          before: beforeOpts,
+        };
         ranges.push({
           range,
-          renderOptions: {
-            before: beforeOpts,
-          },
+          renderOptions,
         });
         filtered.set(decoration.type, ranges);
       }
