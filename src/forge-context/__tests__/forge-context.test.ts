@@ -2,12 +2,12 @@ import { Uri } from "../../test/__mocks__/vscode";
 import { getForgeContext, parseGitRemoteUrl } from "../../forge-context";
 import { config } from "../../config";
 
-const mockLinksEnabled = jest.fn();
+const mockLinksEnabled = vi.fn();
 (config.mentions as any).linksEnabled = mockLinksEnabled;
 
 describe("forge-context", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("parseGitRemoteUrl", () => {

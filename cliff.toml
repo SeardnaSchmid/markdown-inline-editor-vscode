@@ -78,12 +78,15 @@ commit_parsers = [
     { message = "^fix", group = "Fixed" },
     { message = "^docs?", group = "Changed" },
     { message = "^perf", group = "Changed" },
-    { message = "^refactor", group = "Changed" },
-    { message = "^style", group = "Changed" },
-    { message = "^revert", group = "Changed" },
-    { message = "^test", group = "Changed" },
+    { message = "^refactor", group = "Internal" },
+    { message = "^style", group = "Internal" },
+    { message = "^revert", group = "Internal" },
+    { message = "^test", group = "Internal" },
+    { message = "^ci", group = "Internal" },
     { message = "^chore\\(release\\)", skip = true },
-    { message = "^chore", group = "Changed" },
+    { message = "^chore", group = "Internal" },
+    # the rest
+    { message = ".*", group = "Internal" },
 ]
 # Exclude commits that are not matched by any commit parser.
 filter_commits = false

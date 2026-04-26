@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { handleCheckboxClick } from '../checkbox-toggle';
 import { workspace, WorkspaceEdit, Selection, Position, Uri, TextDocument } from '../../test/__mocks__/vscode';
 
@@ -14,7 +15,7 @@ function makeEditor(lineText: string, cursorChar: number) {
 
 describe('handleCheckboxClick', () => {
   beforeEach(() => {
-    (workspace.applyEdit as jest.Mock).mockClear();
+    (workspace.applyEdit as Mock).mockClear();
   });
 
   describe('returns false (no toggle)', () => {
@@ -49,7 +50,7 @@ describe('handleCheckboxClick', () => {
       const result = handleCheckboxClick(editor as any);
       expect(result).toBe(true);
       expect(workspace.applyEdit).toHaveBeenCalledTimes(1);
-      const edit = (workspace.applyEdit as jest.Mock).mock.calls[0][0] as WorkspaceEdit;
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
       const edits = edit.getEdits();
       expect(edits).toHaveLength(1);
       expect(edits[0].newText).toBe('x');
@@ -60,7 +61,7 @@ describe('handleCheckboxClick', () => {
       const editor = makeEditor('- [ ] task', 3);
       const result = handleCheckboxClick(editor as any);
       expect(result).toBe(true);
-      const edit = (workspace.applyEdit as jest.Mock).mock.calls[0][0] as WorkspaceEdit;
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
       expect(edit.getEdits()[0].newText).toBe('x');
     });
 
@@ -69,7 +70,7 @@ describe('handleCheckboxClick', () => {
       const editor = makeEditor('- [ ] task', 4);
       const result = handleCheckboxClick(editor as any);
       expect(result).toBe(true);
-      const edit = (workspace.applyEdit as jest.Mock).mock.calls[0][0] as WorkspaceEdit;
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
       expect(edit.getEdits()[0].newText).toBe('x');
     });
   });
@@ -80,7 +81,7 @@ describe('handleCheckboxClick', () => {
       const editor = makeEditor('- [x] done', 3);
       const result = handleCheckboxClick(editor as any);
       expect(result).toBe(true);
-      const edit = (workspace.applyEdit as jest.Mock).mock.calls[0][0] as WorkspaceEdit;
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
       expect(edit.getEdits()[0].newText).toBe(' ');
     });
 
@@ -88,7 +89,7 @@ describe('handleCheckboxClick', () => {
       const editor = makeEditor('- [X] done', 3);
       const result = handleCheckboxClick(editor as any);
       expect(result).toBe(true);
-      const edit = (workspace.applyEdit as jest.Mock).mock.calls[0][0] as WorkspaceEdit;
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
       expect(edit.getEdits()[0].newText).toBe(' ');
     });
   });
@@ -109,7 +110,7 @@ describe('handleCheckboxClick', () => {
       const editor = makeEditor('[ ] a [ ] b', 7); // cursor inside second checkbox
       const result = handleCheckboxClick(editor as any);
       expect(result).toBe(true);
-      const edit = (workspace.applyEdit as jest.Mock).mock.calls[0][0] as WorkspaceEdit;
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
       const edits = edit.getEdits();
       // The replaced range should be inside the second checkbox (char 7)
       expect(edits[0].range.start.character).toBe(7); // bracketStart(6) + 1

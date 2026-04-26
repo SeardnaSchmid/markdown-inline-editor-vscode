@@ -5,6 +5,7 @@ import { MarkdownParseCache } from './markdown-parse-cache';
 import { renderMermaidSvgNatural, createErrorSvg, svgToDataUri } from './mermaid/mermaid-renderer';
 import { svgToDataUriBase64 } from './mermaid/svg-processor';
 import * as cheerio from 'cheerio';
+import { logWarn } from './logging';
 
 /**
  * Configuration for code block hover previews
@@ -249,7 +250,7 @@ export class CodeBlockHoverProvider implements vscode.HoverProvider {
         height: Math.round(hoverHeight),
       };
     } catch (error) {
-      console.warn('[Code Block Hover] Mermaid render failed:', error instanceof Error ? error.message : error);
+      logWarn('[Code Block Hover] Mermaid render failed', error);
       // Create error SVG to display in hover instead of returning undefined
       // Extract meaningful error message
       let errorMessage: string;
@@ -514,7 +515,7 @@ export class CodeBlockHoverProvider implements vscode.HoverProvider {
 
       return new vscode.Hover(markdown, hoverRange);
     } catch (error) {
-      console.warn(`[Code Block Hover] Failed to create hover for ${language}:`, error);
+      logWarn(`[Code Block Hover] Failed to create hover for ${language}`, error);
       return undefined;
     }
   }

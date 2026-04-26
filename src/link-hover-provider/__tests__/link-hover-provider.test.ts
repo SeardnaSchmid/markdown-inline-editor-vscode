@@ -10,8 +10,8 @@ import {
 } from "../../test/__mocks__/vscode";
 
 // Mock workspace.getConfiguration
-const mockGetConfiguration = jest.fn().mockReturnValue({
-  get: jest.fn().mockReturnValue(false),
+const mockGetConfiguration = vi.fn().mockReturnValue({
+  get: vi.fn().mockReturnValue(false),
 });
 
 (workspace as any).getConfiguration = mockGetConfiguration;
@@ -54,7 +54,7 @@ describe("MarkdownLinkHoverProvider", () => {
       const token = new CancellationToken(false);
 
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string) => {
+        get: vi.fn((key: string) => {
           if (key === "defaultBehaviors.diffView.applyDecorations")
             return false;
           if (key === "links.singleClickOpen") return false;
@@ -117,7 +117,7 @@ describe("MarkdownLinkHoverProvider", () => {
       const token = new CancellationToken(false);
 
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn().mockReturnValue(false),
+        get: vi.fn().mockReturnValue(false),
       });
 
       const result = await provider.provideHover(document, position, token);
@@ -135,7 +135,7 @@ describe("MarkdownLinkHoverProvider", () => {
       const token = new CancellationToken(false);
 
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string) => {
+        get: vi.fn((key: string) => {
           if (key === "defaultBehaviors.diffView.applyDecorations")
             return false;
           if (key === "links.singleClickOpen") return false;
@@ -167,7 +167,7 @@ describe("MarkdownLinkHoverProvider", () => {
       const token = new CancellationToken(false);
 
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string) => {
+        get: vi.fn((key: string) => {
           if (key === "defaultBehaviors.diffView.applyDecorations")
             return false;
           if (key === "links.singleClickOpen") return true;
@@ -221,7 +221,7 @@ describe("MarkdownLinkHoverProvider", () => {
 
       // Access the parser through the parse cache
       const parser = (parseCache as any).parser;
-      const extractSpy = jest.spyOn(parser, "extractDecorationsWithScopes");
+      const extractSpy = vi.spyOn(parser, "extractDecorationsWithScopes");
 
       // First hover - should parse
       await provider.provideHover(document, position, token);
@@ -246,7 +246,7 @@ describe("MarkdownLinkHoverProvider", () => {
       const token = new CancellationToken(false);
 
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string, defaultValue?: unknown) => {
+        get: vi.fn((key: string, defaultValue?: unknown) => {
           if (key === "mentions.enabled") return true;
           if (key === "mentions.linksEnabled") return true;
           if (key === "defaultBehaviors.diffView.applyDecorations")
@@ -279,7 +279,7 @@ describe("MarkdownLinkHoverProvider", () => {
       const token = new CancellationToken(false);
 
       mockGetConfiguration.mockReturnValue({
-        get: jest.fn((key: string, defaultValue?: unknown) => {
+        get: vi.fn((key: string, defaultValue?: unknown) => {
           if (key === "mentions.enabled") return true;
           if (key === "mentions.linksEnabled") return true;
           if (key === "defaultBehaviors.diffView.applyDecorations")

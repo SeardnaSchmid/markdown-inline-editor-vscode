@@ -1,86 +1,35 @@
-import { Range, Position, TextEditor, TextDocument, TextDocumentChangeEvent, window, TextEditorSelectionChangeKind, ColorThemeKind, workspace, DecorationOptions, Memento } from 'vscode';
-import { createHash } from 'crypto';
+import { DecorationOptions, Range, TextEditor, TextDocument, TextDocumentChangeEvent, window, TextEditorSelectionChangeKind, Memento } from 'vscode';
 import { DecorationRange, DecorationType, MermaidBlock, MathRegion, ScopeRange } from './parser';
-import { mapNormalizedToOriginal } from './position-mapping';
 import { config } from './config';
 import { isDiffLikeUri, isDiffViewVisible } from './diff-context';
 import { MarkdownParseCache } from './markdown-parse-cache';
+import {
+  applyFilteredDecorations,
+  buildScopeEntries,
+  createRange as createEditorRange,
+  isSelectionOrCursorInsideOffsets as selectionIntersectsOffsets,
+} from './decorator/editor-decoration-applier';
+import { FileDecorationStateStore } from './decorator/file-decoration-state';
+import { MermaidUpdateCoordinator } from './decorator/mermaid-update-coordinator';
 import { DecorationTypeRegistry } from './decorator/decoration-type-registry';
 import { filterDecorationsForEditor, ScopeEntry } from './decorator/visibility-model';
 import { handleCheckboxClick } from './decorator/checkbox-toggle';
 import { MermaidDiagramDecorations } from './decorator/mermaid-diagram-decorations';
+import { DecoratorUpdateScheduler } from './decorator/update-scheduler';
 import { MathDecorations } from './math/math-decorations';
-import { renderMermaidSvg, svgToDataUri, createErrorSvg } from './mermaid/mermaid-renderer';
 import { MermaidHoverIndicatorDecorationType } from './decorations';
-
-/** Workspace state key prefix for per-file decoration toggle persistence. */
-const DECORATION_STATE_KEY_PREFIX = 'mdInline.decorationsEnabled';
+import { isSupportedMarkdownLanguage } from './language-support';
+import { logDebug, logPerformanceMetric } from './logging';
+import { applyMathDecorationsForEditor } from './decorator/math-region-application';
 
 /**
  * Performance and caching constants.
  */
 const PERFORMANCE_CONSTANTS = {
-  /** Debounce timeout for document changes (ms) - balances responsiveness vs performance */
   DEBOUNCE_TIMEOUT_MS: 150,
-  /** Maximum timeout for requestIdleCallback (ms) - ensures updates don't wait indefinitely */
   IDLE_CALLBACK_TIMEOUT_MS: 300,
-  /** Max Mermaid renders in flight (bounded parallelism) */
   MERMAID_MAX_CONCURRENCY: 4,
 } as const;
-
-type MermaidBlockKeyCacheEntry = {
-  theme: 'default' | 'dark';
-  fontFamily?: string;
-  numLines: number;
-  key: string;
-};
-
-// Cache hash computation results per block object (cleared automatically on GC / parse cache eviction).
-const mermaidBlockKeyCache = new WeakMap<MermaidBlock, MermaidBlockKeyCacheEntry>();
-
-function getMermaidBlockCacheKey(
-  block: MermaidBlock,
-  theme: 'default' | 'dark',
-  fontFamily?: string
-): string {
-  const cached = mermaidBlockKeyCache.get(block);
-  if (
-    cached &&
-    cached.theme === theme &&
-    cached.fontFamily === fontFamily &&
-    cached.numLines === block.numLines
-  ) {
-    return cached.key;
-  }
-
-  const keySource = `${block.source}\n${theme}\n${fontFamily ?? ''}\n${block.numLines}`;
-  const key = createHash('sha256').update(keySource).digest('hex');
-  mermaidBlockKeyCache.set(block, { theme, fontFamily, numLines: block.numLines, key });
-  return key;
-}
-
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  maxConcurrency: number,
-  mapper: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let nextIndex = 0;
-
-  const worker = async () => {
-    while (true) {
-      const index = nextIndex++;
-      if (index >= items.length) {
-        return;
-      }
-      results[index] = await mapper(items[index], index);
-    }
-  };
-
-  const concurrency = Math.max(1, Math.min(maxConcurrency, items.length));
-  await Promise.all(Array.from({ length: concurrency }, () => worker()));
-  return results;
-}
 
 
 /**
@@ -109,32 +58,28 @@ export class Decorator {
   onApply: ((nonEmptyTypeCount: number) => void) | undefined = undefined;
 
   private parseCache: MarkdownParseCache;
-  private updateTimeout: NodeJS.Timeout | undefined;
-
-  /** Pending update batching: track last document version that triggered an update */
-  private pendingUpdateVersion = new Map<string, number>();
-
-  /** requestIdleCallback handle for idle updates */
-  private idleCallbackHandle: number | undefined;
-
-  /** Per-file decoration enabled state, keyed by URI string */
-  private fileDecorationState = new Map<string, boolean>();
-
-  /** Workspace state for persisting per-file toggle state across sessions */
-  private workspaceState?: Memento;
 
   /** Whether to skip decorations in diff views (inverse of applyDecorations setting) */
   private skipDecorationsInDiffView = true;
 
   private decorationTypes: DecorationTypeRegistry;
   private mermaidDecorations = new MermaidDiagramDecorations();
+  private readonly mermaidCoordinator = new MermaidUpdateCoordinator(
+    this.mermaidDecorations,
+    PERFORMANCE_CONSTANTS.MERMAID_MAX_CONCURRENCY
+  );
   private mathDecorations = new MathDecorations();
-  private mermaidUpdateToken = 0;
   private mermaidHoverIndicatorDecorationType = MermaidHoverIndicatorDecorationType();
+  private readonly fileDecorationState: FileDecorationStateStore;
+  private readonly updateScheduler: DecoratorUpdateScheduler;
 
   constructor(parseCache: MarkdownParseCache, workspaceState?: Memento) {
     this.parseCache = parseCache;
-    this.workspaceState = workspaceState;
+    this.fileDecorationState = new FileDecorationStateStore(workspaceState);
+    this.updateScheduler = new DecoratorUpdateScheduler(
+      PERFORMANCE_CONSTANTS.DEBOUNCE_TIMEOUT_MS,
+      PERFORMANCE_CONSTANTS.IDLE_CALLBACK_TIMEOUT_MS
+    );
     this.decorationTypes = new DecorationTypeRegistry({
       getGhostFaintOpacity: () => this.getGhostFaintOpacity(),
       getFrontmatterDelimiterOpacity: () => this.getFrontmatterDelimiterOpacity(),
@@ -169,11 +114,7 @@ export class Decorator {
    * decorator.setActiveEditor(vscode.window.activeTextEditor);
    */
   setActiveEditor(textEditor: TextEditor | undefined) {
-    // Clear any pending debounced updates
-    if (this.updateTimeout) {
-      clearTimeout(this.updateTimeout);
-      this.updateTimeout = undefined;
-    }
+    this.updateScheduler.cancel();
 
     if (!textEditor) {
       return;
@@ -235,51 +176,14 @@ export class Decorator {
     }
 
     const document = event?.document || this.activeEditor.document;
-    const cacheKey = document.uri.toString();
 
     // Invalidate cache on document change
     if (event) {
       this.invalidateCache(document);
     }
-
-    // Track this version to batch updates
-    this.pendingUpdateVersion.set(cacheKey, document.version);
-
-    // Clear any pending timeout-based updates
-    if (this.updateTimeout) {
-      clearTimeout(this.updateTimeout);
-      this.updateTimeout = undefined;
-    }
-
-    // Cancel any pending idle callback
-    if (this.idleCallbackHandle !== undefined) {
-      this.cancelIdleCallback(this.idleCallbackHandle);
-      this.idleCallbackHandle = undefined;
-    }
-
-    // Debounce with two-tier strategy:
-    // 1. Short timeout for responsive feedback
-    // 2. Fallback to idle callback for heavy work during continuous typing
-    this.updateTimeout = setTimeout(() => {
-      this.updateTimeout = undefined;
-
-      // Check if document version changed since we scheduled this update (batching)
-      const latestVersion = this.activeEditor?.document.version;
-      const scheduledVersion = this.pendingUpdateVersion.get(cacheKey);
-
-      if (latestVersion !== undefined && scheduledVersion !== undefined && latestVersion !== scheduledVersion) {
-        // Document changed again, skip this update (another one is queued)
-        return;
-      }
-
-      // Use requestIdleCallback wrapper for non-urgent updates
-      // This will use requestIdleCallback in browser or setTimeout in Node.js
-      this.idleCallbackHandle = this.requestIdleCallback(() => {
-        this.idleCallbackHandle = undefined;
-        this.updateDecorationsInternal();
-        this.pendingUpdateVersion.delete(cacheKey);
-      }, { timeout: PERFORMANCE_CONSTANTS.IDLE_CALLBACK_TIMEOUT_MS });
-    }, PERFORMANCE_CONSTANTS.DEBOUNCE_TIMEOUT_MS);
+    this.updateScheduler.schedule(document, () => {
+      this.updateDecorationsInternal();
+    });
   }
 
   /**
@@ -291,9 +195,7 @@ export class Decorator {
     const uri = this.activeEditor?.document.uri.toString();
     if (!uri) { return true; }
 
-    const next = !this.isEnabledForUri(uri);
-    this.fileDecorationState.set(uri, next);
-    void this.workspaceState?.update(`${DECORATION_STATE_KEY_PREFIX}.${uri}`, next);
+    const next = this.fileDecorationState.toggle(uri);
 
     if (next) {
       // Re-enable: update decorations immediately
@@ -325,12 +227,7 @@ export class Decorator {
    * @returns {boolean} True if decorations are enabled for that file
    */
   private isEnabledForUri(uri: string): boolean {
-    let cached = this.fileDecorationState.get(uri);
-    if (cached === undefined) {
-      cached = this.workspaceState?.get<boolean>(`${DECORATION_STATE_KEY_PREFIX}.${uri}`, true) ?? true;
-      this.fileDecorationState.set(uri, cached);
-    }
-    return cached;
+    return this.fileDecorationState.isEnabled(uri);
   }
 
   /**
@@ -340,22 +237,7 @@ export class Decorator {
    * @param {string} newUri - The new file URI string
    */
   renameFile(oldUri: string, newUri: string): void {
-    const oldKey = `${DECORATION_STATE_KEY_PREFIX}.${oldUri}`;
-    const newKey = `${DECORATION_STATE_KEY_PREFIX}.${newUri}`;
-
-    // Migrate in-memory state
-    const cachedValue = this.fileDecorationState.get(oldUri);
-    if (cachedValue !== undefined) {
-      this.fileDecorationState.set(newUri, cachedValue);
-      this.fileDecorationState.delete(oldUri);
-    }
-
-    // Migrate persisted state, using cached value when available to avoid a redundant read
-    const persistedValue = cachedValue ?? this.workspaceState?.get<boolean | undefined>(oldKey, undefined);
-    if (persistedValue !== undefined) {
-      void this.workspaceState?.update(newKey, persistedValue);
-      void this.workspaceState?.update(oldKey, undefined);
-    }
+    this.fileDecorationState.renameFile(oldUri, newUri);
   }
 
   /**
@@ -402,6 +284,7 @@ export class Decorator {
 
     // Early exit if decorations are disabled for this file
     if (!this.isEnabledForUri(document.uri.toString())) {
+      logDebug('skip decoration update for disabled file', { uri: document.uri.toString() });
       return;
     }
 
@@ -412,21 +295,31 @@ export class Decorator {
 
     // Check if we should skip decorations in diff mode
     if (this.skipDecorationsInDiffView && this.isDiffEditor()) {
+      logDebug('skip decoration update in diff view', { uri: document.uri.toString() });
       this.clearAllDecorations();
       return;
     }
 
     // Parse document (uses cache if version unchanged)
+    const cycleStart = Date.now();
     const version = document.version;
     const { decorations, scopes, text, mermaidBlocks, mathRegions } = this.parseDocument(document);
+    const parseDurationMs = Date.now() - cycleStart;
 
     // Re-validate version before applying (race condition protection)
     if (document.version !== version) {
+      logDebug('skip stale decoration update', {
+        uri: document.uri.toString(),
+        scheduledVersion: version,
+        currentVersion: document.version,
+      });
       return; // Document changed during parse, skip this update
     }
 
     // Filter decorations based on selections (pass original text for offset adjustment)
+    const filterStart = Date.now();
     const filtered = this.filterDecorations(decorations, scopes, text);
+    const filterDurationMs = Date.now() - filterStart;
 
     // Apply decorations
     this.applyDecorations(filtered);
@@ -438,6 +331,20 @@ export class Decorator {
       }
     }
     void this.updateMermaidDiagrams(mermaidBlocks, text, document.version);
+    if (config.debug.performanceEnabled()) {
+      logPerformanceMetric('decorator.update', {
+        uri: document.uri.toString(),
+        version,
+        parseMs: parseDurationMs,
+        filterMs: filterDurationMs,
+        totalMs: Date.now() - cycleStart,
+        decorations: decorations.length,
+        scopes: scopes.length,
+        mermaidBlocks: mermaidBlocks.length,
+        mathRegions: mathRegions.length,
+        filteredDecorationTypes: filtered.size,
+      });
+    }
   }
 
   /**
@@ -446,21 +353,12 @@ export class Decorator {
    */
   private applyMathDecorations(mathRegions: MathRegion[], normalizedText: string): void {
     if (!this.activeEditor) return;
-    const editor = this.activeEditor;
-    const regionsWithRanges = mathRegions.map((region) => {
-      const inside = this.isSelectionOrCursorInsideOffsets(
-        region.startPos,
-        region.endPos,
-        normalizedText,
-        editor.selections,
-        editor.document
-      );
-      return {
-        region,
-        range: inside ? null : this.createRange(region.startPos, region.endPos, normalizedText),
-      };
-    });
-    this.mathDecorations.apply(editor, regionsWithRanges);
+    applyMathDecorationsForEditor(
+      this.activeEditor,
+      mathRegions,
+      normalizedText,
+      this.mathDecorations
+    );
   }
 
   /**
@@ -478,7 +376,7 @@ export class Decorator {
     // 'mdc'           (#61): Nuxt Content .mdc files assigned languageId 'mdc' by vscode-mdc.
     // 'juliamarkdown' (#61): Julia Markdown files (VS Code built-in identifier).
     // 'rmarkdown'     (#61): R Markdown files assigned languageId 'rmarkdown' by vscode-R.
-    return ['markdown', 'md', 'mdx', 'skill', 'markdoc', 'mdc', 'juliamarkdown', 'rmarkdown'].includes(this.activeEditor.document.languageId);
+    return isSupportedMarkdownLanguage(this.activeEditor.document.languageId);
   }
 
   /**
@@ -496,7 +394,6 @@ export class Decorator {
       return false;
     }
 
-    // Check the active editor first
     if (isDiffLikeUri(this.activeEditor.document.uri)) {
       return true;
     }
@@ -543,125 +440,13 @@ export class Decorator {
     }
 
     const editor = this.activeEditor;
-    if (mermaidBlocks.length === 0) {
-      this.mermaidDecorations.clear(editor);
-      editor.setDecorations(this.mermaidHoverIndicatorDecorationType, []);
-      return;
-    }
-
-    const token = ++this.mermaidUpdateToken;
-    const theme = window.activeColorTheme.kind === ColorThemeKind.Dark ||
-      window.activeColorTheme.kind === ColorThemeKind.HighContrast
-      ? 'dark'
-      : 'default';
-    const fontFamily = workspace.getConfiguration('editor').get<string>('fontFamily');
-
-    const rangesByKey = new Map<string, Range[]>();
-    const dataUrisByKey = new Map<string, string>();
-    const indicatorRanges: Range[] = [];
-
-    const originalText = editor.document.getText();
-
-    // Deduplicate renders for identical keys during this update (parallel-safe).
-    const dataUriPromisesByKey = new Map<string, Promise<string>>();
-
-    const results = await mapWithConcurrency(
+    await this.mermaidCoordinator.update(
+      editor,
       mermaidBlocks,
-      PERFORMANCE_CONSTANTS.MERMAID_MAX_CONCURRENCY,
-      async (block): Promise<{ key: string; range: Range; dataUri: string; indicatorRange: Range } | null> => {
-        // Early exit checks (token/version can change while we await renders).
-        if (token !== this.mermaidUpdateToken || editor.document.version !== documentVersion) {
-          return null;
-        }
-
-        if (this.isSelectionOrCursorInsideOffsets(block.startPos, block.endPos, text, editor.selections, editor.document)) {
-          return null;
-        }
-
-        const range = this.createRange(block.startPos, block.endPos, text);
-        if (!range) {
-          return null;
-        }
-
-        // Add indicator decoration at the start of the mermaid block content
-        // Place it at the beginning of the first line of content (after opening fence line).
-        const blockStart = mapNormalizedToOriginal(block.startPos, text);
-        const openingFenceLineEnd = originalText.indexOf('\n', blockStart);
-        const contentStart = openingFenceLineEnd !== -1 ? openingFenceLineEnd + 1 : blockStart;
-
-        const contentStartPos = editor.document.positionAt(contentStart);
-        // Create a small range (1 character) at the start of content for the indicator.
-        const line = editor.document.lineAt(contentStartPos.line);
-        const indicatorEndChar = Math.min(contentStartPos.character + 1, line.text.length);
-        const indicatorRange = new Range(
-          contentStartPos,
-          new Position(contentStartPos.line, indicatorEndChar)
-        );
-
-        const key = getMermaidBlockCacheKey(block, theme, fontFamily);
-
-        let dataUriPromise = dataUriPromisesByKey.get(key);
-        if (!dataUriPromise) {
-          dataUriPromise = (async () => {
-            try {
-              const svg = await renderMermaidSvg(block.source, { theme, fontFamily, numLines: block.numLines });
-              return svgToDataUri(svg);
-            } catch (error) {
-              console.warn('Mermaid render failed:', error instanceof Error ? error.message : error);
-              // Create error SVG to display instead of silently failing.
-              let errorMessage: string;
-              if (error instanceof Error) {
-                errorMessage = error.message || error.toString() || 'Rendering failed';
-              } else if (typeof error === 'string') {
-                errorMessage = error;
-              } else {
-                errorMessage = String(error) || 'Rendering failed';
-              }
-              if (!errorMessage || errorMessage.trim().length === 0) {
-                errorMessage = 'Unknown rendering error occurred';
-              }
-              const errorSvg = createErrorSvg(
-                errorMessage,
-                Math.max(400, block.numLines * 20),
-                block.numLines * 20,
-                theme === 'dark'
-              );
-              return svgToDataUri(errorSvg);
-            }
-          })();
-          dataUriPromisesByKey.set(key, dataUriPromise);
-        }
-
-        const dataUri = await dataUriPromise;
-
-        if (token !== this.mermaidUpdateToken || editor.document.version !== documentVersion) {
-          return null;
-        }
-
-        return { key, range, dataUri, indicatorRange };
-      }
+      text,
+      documentVersion,
+      this.mermaidHoverIndicatorDecorationType
     );
-
-    // Merge results sequentially (single apply at end).
-    for (const result of results) {
-      if (!result) {
-        continue;
-      }
-      dataUrisByKey.set(result.key, result.dataUri);
-      const ranges = rangesByKey.get(result.key) || [];
-      ranges.push(result.range);
-      rangesByKey.set(result.key, ranges);
-      indicatorRanges.push(result.indicatorRange);
-    }
-
-    if (token !== this.mermaidUpdateToken || editor.document.version !== documentVersion) {
-      return;
-    }
-
-    this.mermaidDecorations.apply(editor, rangesByKey, dataUrisByKey);
-    
-    // Apply hover indicator decorations
-    editor.setDecorations(this.mermaidHoverIndicatorDecorationType, indicatorRanges);
   }
 
   private isSelectionOrCursorInsideOffsets(
@@ -671,41 +456,14 @@ export class Decorator {
     selections: readonly Range[],
     document: TextDocument
   ): boolean {
-    const mappedStart = mapNormalizedToOriginal(startPos, text);
-    const mappedEnd = mapNormalizedToOriginal(endPos, text);
-
-    return selections.some((selection) => {
-      const selectionStart = document.offsetAt(selection.start);
-      const selectionEnd = document.offsetAt(selection.end);
-      if (selectionStart === selectionEnd) {
-        return selectionStart >= mappedStart && selectionStart <= mappedEnd;
-      }
-      return selectionStart <= mappedEnd && selectionEnd >= mappedStart;
-    });
+    return selectionIntersectsOffsets(startPos, endPos, text, selections, document);
   }
 
   /**
    * Builds scope entries from parser-emitted scope ranges.
    */
   private buildScopeEntries(scopes: ScopeRange[], originalText: string): ScopeEntry[] {
-    if (!this.activeEditor || scopes.length === 0) {
-      return [];
-    }
-
-    const entries: ScopeEntry[] = [];
-    for (const scope of scopes) {
-      const range = this.createRange(scope.startPos, scope.endPos, originalText);
-      if (range) {
-        entries.push({
-          startPos: scope.startPos,
-          endPos: scope.endPos,
-          range,
-          kind: scope.kind,
-        });
-      }
-    }
-
-    return entries;
+    return buildScopeEntries(this.activeEditor, scopes, originalText);
   }
 
   /**
@@ -745,42 +503,7 @@ export class Decorator {
     if (!this.activeEditor) {
       return;
     }
-
-    // Types that use per-range renderOptions (DecorationOptions, not plain Range)
-    const renderOptionsTypes = new Set<DecorationType>([
-      'emoji', 'orderedListItem', 'tablePipe', 'tableSeparatorPipe', 'tableSeparatorDash', 'tableCell',
-    ]);
-
-    // Apply all decorations by iterating through the type map
-    for (const [type, decorationType] of this.decorationTypes.getMap().entries()) {
-      if (type === 'emoji') {
-        if (!config.emojis.enabled()) {
-          this.activeEditor.setDecorations(decorationType, []);
-          continue;
-        }
-        const emojiRanges = filteredDecorations.get(type) as DecorationOptions[] | undefined;
-        this.activeEditor.setDecorations(decorationType, emojiRanges || []);
-        continue;
-      }
-
-      if (renderOptionsTypes.has(type)) {
-        const optionsRanges = filteredDecorations.get(type) as DecorationOptions[] | undefined;
-        this.activeEditor.setDecorations(decorationType, optionsRanges || []);
-        continue;
-      }
-
-      const ranges = filteredDecorations.get(type) as Range[] | undefined;
-      this.activeEditor.setDecorations(decorationType, ranges || []);
-    }
-
-    const ghostFaintRanges = (filteredDecorations.get('ghostFaint') as Range[] | undefined) || [];
-    this.activeEditor.setDecorations(this.decorationTypes.getGhostFaintDecorationType(), ghostFaintRanges);
-
-    // Fire optional test hook (E2E only — undefined in production).
-    if (this.onApply) {
-      const nonEmptyTypeCount = [...filteredDecorations.values()].filter(r => r.length > 0).length;
-      this.onApply(nonEmptyTypeCount);
-    }
+    applyFilteredDecorations(this.activeEditor, filteredDecorations, this.decorationTypes, this.onApply);
   }
 
   /**
@@ -917,46 +640,9 @@ export class Decorator {
    * Dispose of resources and clear any pending updates.
    */
   dispose() {
-    if (this.updateTimeout) {
-      clearTimeout(this.updateTimeout);
-      this.updateTimeout = undefined;
-    }
-    if (this.idleCallbackHandle !== undefined) {
-      this.cancelIdleCallback(this.idleCallbackHandle);
-      this.idleCallbackHandle = undefined;
-    }
-    this.pendingUpdateVersion.clear();
-
+    this.updateScheduler.dispose();
     this.decorationTypes.dispose();
     this.mermaidHoverIndicatorDecorationType.dispose();
-  }
-
-  /**
-   * Wrapper for requestIdleCallback that falls back to setTimeout if not available.
-   * 
-   * VS Code extensions run in Node.js, which doesn't have requestIdleCallback.
-   * This method uses setTimeout as a fallback to simulate idle behavior.
-   * 
-   * @private
-   * @param {Function} callback - The callback to execute when idle
-   * @param {Object} options - Options for requestIdleCallback
-   * @returns {number} Handle for cancellation
-   */
-  private requestIdleCallback(callback: () => void, options?: { timeout?: number }): number {
-    // VS Code runs in Node.js, use setTimeout as fallback
-    // In future, if running in browser context, we could check for requestIdleCallback
-    return setTimeout(callback, options?.timeout || 50) as unknown as number;
-  }
-
-  /**
-   * Wrapper for cancelIdleCallback that falls back to clearTimeout if not available.
-   * 
-   * @private
-   * @param {number} handle - The handle returned by requestIdleCallback
-   */
-  private cancelIdleCallback(handle: number): void {
-    // VS Code runs in Node.js, use clearTimeout as fallback
-    clearTimeout(handle);
   }
 
 
@@ -975,20 +661,9 @@ export class Decorator {
    * @returns {Range | null} VS Code Range or null if invalid
    */
   private createRange(startPos: number, endPos: number, originalText?: string): Range | null {
-    if (!this.activeEditor) return null;
-
-    try {
-      // Map normalized positions to original document positions
-      const mappedStart = mapNormalizedToOriginal(startPos, originalText);
-      const mappedEnd = mapNormalizedToOriginal(endPos, originalText);
-
-      const start = this.activeEditor.document.positionAt(mappedStart);
-      const end = this.activeEditor.document.positionAt(mappedEnd);
-      return new Range(start, end);
-    } catch {
-      // Invalid position
-      return null;
-    }
+    return this.activeEditor
+      ? createEditorRange(this.activeEditor, startPos, endPos, originalText)
+      : null;
   }
 
 }

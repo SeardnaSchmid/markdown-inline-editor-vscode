@@ -36,6 +36,8 @@ The codebase has good separation in some areas (`position-mapping.ts`, `decorati
 
 ### 1. Text Normalization Logic Duplication
 
+**Status:** Resolved in 2026 refactor
+
 **Status:** 🔴 High Priority  
 **Location:** `src/parser.ts:124-126`, `src/parser/__tests__/helpers/crlf-helpers.ts:9-10`
 
@@ -63,6 +65,8 @@ The codebase has good separation in some areas (`position-mapping.ts`, `decorati
 ---
 
 ### 2. Configuration Reading Duplication
+
+**Status:** Resolved in 2026 refactor
 
 **Status:** 🔴 High Priority  
 **Location:** `src/extension.ts:11-24`, `src/link-provider.ts:30-31`
@@ -100,6 +104,8 @@ export function getDiffViewApplyDecorations(): boolean {
 ---
 
 ### 3. Diff Detection Logic Duplication
+
+**Status:** Resolved in 2026 refactor
 
 **Status:** 🟡 Medium Priority  
 **Location:** `src/decorator.ts:422-499`, `src/link-provider.ts:35-36`
@@ -144,6 +150,8 @@ export function isDiffEditor(editor: TextEditor): boolean {
 ---
 
 ### 4. URL Resolution Logic Complexity
+
+**Status:** Resolved in 2026 refactor
 
 **Status:** 🟡 Medium Priority  
 **Location:** `src/link-provider.ts:62-75`
@@ -192,6 +200,8 @@ export function resolveLinkTarget(url: string, documentUri: vscode.Uri): vscode.
 ---
 
 ### 5. Extension.ts Domain Mixing
+
+**Status:** Resolved in 2026 refactor
 
 **Status:** 🟡 Medium Priority  
 **Location:** `src/extension.ts`
@@ -250,6 +260,8 @@ export function activate(context: vscode.ExtensionContext) {
 ---
 
 ### 6. Parser.ts Helper Methods
+
+**Status:** Resolved in 2026 refactor
 
 **Status:** 🟢 Low Priority  
 **Location:** `src/parser.ts:249-269`
@@ -388,5 +400,5 @@ src/
 ## References
 
 - [AGENTS.md](../AGENTS.md) - Project guidelines
-- [TECHNICAL_DEBT.md](./TECHNICAL_DEBT.md) - Related technical debt items
+- [runtime-pipeline.md](../architecture/runtime-pipeline.md) - Current runtime boundaries after the refactor
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines

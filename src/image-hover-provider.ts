@@ -1,9 +1,14 @@
 import * as vscode from 'vscode';
-import { mapNormalizedToOriginal } from './position-mapping';
 import { shouldSkipInDiffView } from './diff-context';
-import { resolveImageTarget } from './link-targets';
 import { config } from './config';
 import { MarkdownParseCache } from './markdown-parse-cache';
+import {
+  createDecorationRange,
+  findDecorationAtOffset,
+  isLinkDecoration,
+  resolveInteractionTarget,
+  toInteractionUri,
+} from './link-interactions/shared';
 
 /**
  * Provides an image preview hover for markdown image constructs.
@@ -38,46 +43,35 @@ export class MarkdownImageHoverProvider implements vscode.HoverProvider {
     const decorations = parseEntry.decorations;
     const hoverOffset = document.offsetAt(position);
     const singleClickEnabled = config.links.singleClickOpen();
-
-    for (const decoration of decorations) {
-      if (token.isCancellationRequested) {
-        return;
-      }
-
-      if (decoration.type !== 'image' || !decoration.url) {
-        continue;
-      }
-
-      // Map normalized positions (parser) to original document offsets (VS Code)
-      const start = mapNormalizedToOriginal(decoration.startPos, text);
-      const end = mapNormalizedToOriginal(decoration.endPos, text);
-
-      if (hoverOffset < start || hoverOffset >= end) {
-        continue;
-      }
-
-      const target = resolveImageTarget(decoration.url, document.uri);
-      if (!target) {
-        return;
-      }
-
-      // Render the image inside the hover with size constraints.
-      const targetUri = escapeHtmlAttribute(target.toString(true));
-      const markdown = new vscode.MarkdownString(
-        `<img src="${targetUri}" style="max-width: 400px; max-height: 300px;" />`
-      );
-      markdown.appendText(`\n\nImage URL: ${decoration.url}`);
-      if (!singleClickEnabled) {
-        markdown.appendMarkdown('\n\n*Direct click disabled (enable in settings).*');
-      }
-      markdown.supportHtml = true;
-      markdown.isTrusted = target.scheme === 'file' || target.scheme === 'vscode-remote';
-
-      const hoverRange = new vscode.Range(document.positionAt(start), document.positionAt(end));
-      return new vscode.Hover(markdown, hoverRange);
+    const decoration = findDecorationAtOffset(
+      decorations,
+      text,
+      hoverOffset,
+      document,
+      (candidate) => candidate.type === 'image' && isLinkDecoration(candidate)
+    );
+    if (!decoration) {
+      return;
     }
 
-    return;
+    const target = resolveInteractionTarget(decoration, document.uri);
+    if (!target) {
+      return;
+    }
+
+    const targetUri = escapeHtmlAttribute(toInteractionUri(target).toString(true));
+    const markdown = new vscode.MarkdownString(
+      `<img src="${targetUri}" style="max-width: 400px; max-height: 300px;" />`
+    );
+    markdown.appendText(`\n\nImage URL: ${decoration.url}`);
+    if (!singleClickEnabled) {
+      markdown.appendMarkdown('\n\n*Direct click disabled (enable in settings).*');
+    }
+    markdown.supportHtml = true;
+    const trustedTarget = toInteractionUri(target);
+    markdown.isTrusted = trustedTarget.scheme === 'file' || trustedTarget.scheme === 'vscode-remote';
+
+    return new vscode.Hover(markdown, createDecorationRange(document, decoration, text));
   }
 
 }
@@ -89,4 +83,3 @@ function escapeHtmlAttribute(value: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
-

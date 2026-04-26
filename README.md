@@ -199,7 +199,7 @@ Press `F5` to launch the Extension Development Host and test your changes.
 - **[remark](https://github.com/remarkjs/remark)** – Markdown parser for precise AST-based parsing
 - **[unified](https://github.com/unifiedjs/unified)** – AST processing framework
 - **[remark-gfm](https://github.com/remarkjs/remark-gfm)** – GitHub Flavored Markdown support
-- **Jest** – Testing framework
+- **Vitest** – Testing framework
 
 **Runtime Requirements:**
 - **Node.js** 20 or higher
@@ -209,7 +209,7 @@ Press `F5` to launch the Extension Development Host and test your changes.
 - `remark-gfm`, `remark-parse`, `unified`, `unist-util-visit`
 
 **Development Dependencies:**
-- TypeScript, Jest, ESLint, VS Code extension tools
+- TypeScript, Vitest, ESLint, VS Code extension tools
 
 ### Architecture
 

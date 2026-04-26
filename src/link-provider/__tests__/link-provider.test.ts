@@ -8,7 +8,7 @@ import {
   workspace,
 } from "../../test/__mocks__/vscode";
 
-const mockGetConfiguration = jest.fn();
+const mockGetConfiguration = vi.fn();
 (workspace as any).getConfiguration = mockGetConfiguration;
 
 describe("MarkdownLinkProvider", () => {
@@ -21,7 +21,7 @@ describe("MarkdownLinkProvider", () => {
     provider = new MarkdownLinkProvider(parseCache);
 
     mockGetConfiguration.mockReturnValue({
-      get: jest.fn((key: string, defaultValue?: unknown) => {
+      get: vi.fn((key: string, defaultValue?: unknown) => {
         if (key === "defaultBehaviors.diffView.applyDecorations") return false;
         if (key === "mentions.enabled") return true;
         if (key === "mentions.linksEnabled") return undefined;
@@ -29,7 +29,7 @@ describe("MarkdownLinkProvider", () => {
       }),
     });
 
-    (workspace as any).getWorkspaceFolder = jest.fn(() => undefined);
+    (workspace as any).getWorkspaceFolder = vi.fn(() => undefined);
   });
 
   it("returns no links for non-markdown documents", () => {
@@ -112,13 +112,13 @@ describe("MarkdownLinkProvider", () => {
   });
 
   it("resolves standalone #123 when workspace owner/repo is available", () => {
-    (workspace as any).getWorkspaceFolder = jest.fn(() => ({
+    (workspace as any).getWorkspaceFolder = vi.fn(() => ({
       uri: Uri.file("/tmp/workspace"),
       name: "workspace",
     }));
 
     mockGetConfiguration.mockReturnValue({
-      get: jest.fn((key: string, defaultValue?: unknown) => {
+      get: vi.fn((key: string, defaultValue?: unknown) => {
         if (key === "defaultBehaviors.diffView.applyDecorations") return false;
         if (key === "mentions.enabled") return true;
         if (key === "mentions.linksEnabled") return true;

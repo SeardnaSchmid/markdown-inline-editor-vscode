@@ -60,7 +60,7 @@ extractDecorations(text: string): DecorationRange[] {
 
 ### 4. Testing
 
-**All changes must include tests.** The project uses Jest for testing with **438+ passing tests** across 33 test suites.
+**All changes must include tests.** The project uses Vitest for testing with **770+ passing tests** across 60+ test files.
 
 **Run tests:**
 ```bash

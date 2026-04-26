@@ -1,4 +1,6 @@
 // Mock VS Code API for testing
+import { vi } from 'vitest';
+
 class MockRange {
   constructor(
     public start: { line: number; character: number },
@@ -173,12 +175,20 @@ class MockTextDocument {
 export const TextDocument = MockTextDocument as any;
 
 class MockTextEditor {
+  public selection: MockSelection;
+
   constructor(
     public document: MockTextDocument,
     public selections: MockSelection[],
-  ) {}
+  ) {
+    this.selection = selections[0] ?? new MockSelection({ line: 0, character: 0 }, { line: 0, character: 0 });
+  }
 
   setDecorations(_decorationType: any, _ranges: MockRange[]): void {
+    // Mock implementation
+  }
+
+  revealRange(_range: MockRange, _revealType?: unknown): void {
     // Mock implementation
   }
 }
@@ -206,15 +216,21 @@ export function resetTextEditorDecorationTypeOptionsCapture(): void {
 }
 
 export const window = {
-  createTextEditorDecorationType: jest.fn((options: unknown) => {
+  createTextEditorDecorationType: vi.fn((options: unknown) => {
     lastTextEditorDecorationTypeOptions = options;
-    return { dispose: jest.fn() };
+    return { dispose: vi.fn() };
   }),
+  createOutputChannel: vi.fn(() => ({
+    appendLine: vi.fn(),
+    dispose: vi.fn(),
+  })),
   activeTextEditor: undefined as any,
   visibleTextEditors: [] as any[],
   activeColorTheme: {
     kind: ColorThemeKind.Dark,
   },
+  showInformationMessage: vi.fn(),
+  showTextDocument: vi.fn(async (document: MockTextDocument) => new MockTextEditor(document, [])),
   onDidChangeActiveTextEditor: () => ({ dispose: () => {} }),
   onDidChangeTextEditorSelection: () => ({ dispose: () => {} }),
   onDidChangeActiveColorTheme: () => ({ dispose: () => {} }),
@@ -237,7 +253,12 @@ export const workspace = {
   onDidChangeTextDocument: () => ({ dispose: () => {} }),
   onDidChangeConfiguration: () => ({ dispose: () => {} }),
   onDidRenameFiles: () => ({ dispose: () => {} }),
-  applyEdit: jest.fn().mockResolvedValue(true),
+  applyEdit: vi.fn().mockResolvedValue(true),
+  openTextDocument: vi.fn(async (uri: ReturnType<typeof Uri.file>) => new MockTextDocument(uri, "markdown", 1, "")),
+  asRelativePath: vi.fn((uri: { toString?: () => string } | string) => {
+    const value = typeof uri === "string" ? uri : uri.toString?.() ?? "";
+    return value.replace(/^file:\/\/\/?/, "");
+  }),
   getConfiguration: (section?: string) => ({
     get: <T>(key: string, defaultValue: T): T => {
       // Return default value for all configuration keys in tests
@@ -299,8 +320,23 @@ export const CancellationToken = class {
 };
 
 export const commands = {
-  executeCommand: jest.fn(),
+  executeCommand: vi.fn(),
+  registerCommand: vi.fn((_command: string, _handler: (...args: any[]) => any) => ({ dispose: vi.fn() })),
 };
+
+export const extensions = {
+  getExtension: vi.fn(),
+};
+
+export const languages = {
+  registerDocumentLinkProvider: vi.fn((_selector: unknown, _provider: unknown) => ({ dispose: vi.fn() })),
+  registerHoverProvider: vi.fn((_selector: unknown, _provider: unknown) => ({ dispose: vi.fn() })),
+};
+
+export enum TextEditorRevealType {
+  Default = 0,
+  InCenter = 1,
+}
 
 export enum TextEditorSelectionChangeKind {
   Mouse = 1,

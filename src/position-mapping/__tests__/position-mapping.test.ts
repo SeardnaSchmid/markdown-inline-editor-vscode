@@ -1,4 +1,4 @@
-import { mapNormalizedToOriginal, normalizeAnchorText } from '../../position-mapping';
+import { mapNormalizedToOriginal, normalizeAnchorText, normalizeToLF } from '../../position-mapping';
 
 describe('mapNormalizedToOriginal', () => {
   describe('LF-only documents (no CRLF)', () => {
@@ -95,5 +95,15 @@ describe('normalizeAnchorText', () => {
 
   it('handles empty string', () => {
     expect(normalizeAnchorText('')).toBe('');
+  });
+});
+
+describe('normalizeToLF', () => {
+  it('normalizes CRLF and CR line endings to LF', () => {
+    expect(normalizeToLF('a\r\nb\rc')).toBe('a\nb\nc');
+  });
+
+  it('returns the same text when no CR characters are present', () => {
+    expect(normalizeToLF('a\nb\nc')).toBe('a\nb\nc');
   });
 });

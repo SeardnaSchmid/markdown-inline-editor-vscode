@@ -3,6 +3,7 @@ import { ColorThemeKind } from 'vscode';
 import type { PendingRender, RenderResponse } from './types';
 import { MERMAID_CONSTANTS } from './constants';
 import { createErrorSvg } from './error-handler';
+import { logWarn } from '../logging';
 
 /**
  * Manages the Mermaid webview lifecycle and communication
@@ -77,7 +78,7 @@ export class MermaidWebviewManager {
             })
             .catch((err: unknown) => {
               if (err instanceof Error && err.message === 'timeout') {
-                console.warn('Mermaid: Webview not ready after opening view');
+                logWarn('Mermaid: Webview not ready after opening view');
               }
               this.initTimeoutId = setTimeout(() => {
                 vscode.commands.executeCommand('workbench.view.explorer');
@@ -87,7 +88,7 @@ export class MermaidWebviewManager {
         },
         (err: unknown) => {
           if (err !== undefined) {
-            console.warn('Mermaid: Failed to focus view', err);
+            logWarn('Mermaid: Failed to focus view', err);
           }
         }
       );

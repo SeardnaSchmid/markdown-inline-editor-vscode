@@ -7,6 +7,16 @@
  */
 
 /**
+ * Normalizes any mix of CRLF/CR line endings to LF.
+ *
+ * @param text - Source text with arbitrary line endings
+ * @returns Text normalized to LF-only line endings
+ */
+export function normalizeToLF(text: string): string {
+  return text.includes('\r') ? text.replace(/\r\n|\r/g, '\n') : text;
+}
+
+/**
  * Maps a position from normalized text (LF only) to original document text.
  * This accounts for CRLF -> LF normalization done by the parser.
  * 

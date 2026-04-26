@@ -1,4 +1,4 @@
-jest.mock('../../parser', () => ({
+vi.mock('../../parser', () => ({
   MarkdownParser: class {
     extractDecorations() { return []; }
   },
