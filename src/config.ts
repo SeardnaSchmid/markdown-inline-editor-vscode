@@ -33,6 +33,12 @@ export const config = {
         .getConfiguration(SECTION)
         .get<boolean>('links.singleClickOpen', false);
     },
+    /** Chain (🔗) icon after link text; off by default so raw markdown tables stay aligned. */
+    showEmoji(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('links.showEmoji', false);
+    },
   },
   decorations: {
     ghostFaintOpacity(): number {

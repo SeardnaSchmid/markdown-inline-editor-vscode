@@ -152,6 +152,12 @@
           "description": "Open links and images with single click",
           "markdownDescription": "Single-click to open links and image links (no Ctrl+Click needed). May interfere with text selection."
         },
+        "markdownInlineEditor.links.showEmoji": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show a chain icon after hyperlink text",
+          "markdownDescription": "Show a chain emoji (🔗) after decorated link text."
+        },
         "markdownInlineEditor.emojis.enabled": {
           "type": "boolean",
           "default": true,

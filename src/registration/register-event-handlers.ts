@@ -47,6 +47,10 @@ export function registerEventHandlers(
         linkClickHandler.setEnabled(config.links.singleClickOpen());
       }
 
+      if (event.affectsConfiguration('markdownInlineEditor.links.showEmoji')) {
+        decorator.recreateLinkDecorationType();
+      }
+
       if (event.affectsConfiguration('markdownInlineEditor.colors')) {
         decorator.recreateColorDependentTypes();
       }

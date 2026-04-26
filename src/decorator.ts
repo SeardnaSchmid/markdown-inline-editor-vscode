@@ -139,6 +139,7 @@ export class Decorator {
       getHeading5Color: () => config.colors.heading5(),
       getHeading6Color: () => config.colors.heading6(),
       getLinkColor: () => config.colors.link(),
+      getLinkShowEmoji: () => config.links.showEmoji(),
       getListMarkerColor: () => config.colors.listMarker(),
       getInlineCodeColor: () => config.colors.inlineCode(),
       getInlineCodeBackgroundColor: () => config.colors.inlineCodeBackground(),
@@ -743,6 +744,16 @@ export class Decorator {
     this.decorationTypes.recreateCodeDecorationType();
 
     // Reapply decorations with the new decoration type
+    if (this.activeEditor && this.isMarkdownDocument()) {
+      this.updateDecorationsForSelection();
+    }
+  }
+
+  /**
+   * Recreates link decoration (underline + optional chain icon) when link emoji setting changes.
+   */
+  recreateLinkDecorationType(): void {
+    this.decorationTypes.recreateLinkDecorationType();
     if (this.activeEditor && this.isMarkdownDocument()) {
       this.updateDecorationsForSelection();
     }

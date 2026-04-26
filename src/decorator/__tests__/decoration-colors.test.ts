@@ -87,10 +87,26 @@ describe('decoration creation with color (hex vs theme)', () => {
   });
 
   describe('syntax decorations (non-heading)', () => {
+    beforeEach(() => {
+      resetTextEditorDecorationTypeOptionsCapture();
+    });
+
     it('creates link decoration with hex and without', () => {
       expect(LinkDecorationType('#61afef')).toBeDefined();
       expect(LinkDecorationType()).toBeDefined();
       expect(LinkDecorationType(new ThemeColor('textLink.foreground'))).toBeDefined();
+    });
+
+    it('omits chain emoji after link text by default', () => {
+      LinkDecorationType('#61afef');
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect('after' in opts).toBe(false);
+    });
+
+    it('adds chain emoji after link text when showEmoji is true', () => {
+      LinkDecorationType('#61afef', true);
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect((opts.after as { contentText?: string }).contentText).toBe(' 🔗');
     });
 
     it('creates blockquote, list, code, emphasis decorations with hex or theme fallback', () => {

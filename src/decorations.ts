@@ -340,18 +340,23 @@ export function Heading6DecorationType(color?: string | ThemeColor) {
  * Sets cursor to pointer on hover to indicate clickability.
  *
  * @param {string | ThemeColor | undefined} color - Optional hex or theme color; when undefined uses textLink.foreground
+ * @param {boolean} showEmoji - When true, appends a chain icon after link text (can misalign monospace tables when off is preferred).
  * @returns {vscode.TextEditorDecorationType} A decoration type for links
  */
-export function LinkDecorationType(color?: string | ThemeColor) {
+export function LinkDecorationType(color?: string | ThemeColor, showEmoji = false) {
   const resolvedColor = color ?? new ThemeColor('textLink.foreground');
   return window.createTextEditorDecorationType({
     color: resolvedColor,
     textDecoration: 'underline',
     cursor: 'pointer',
-    after: {
-      contentText: ' 🔗',
-      color: resolvedColor,
-    },
+    ...(showEmoji
+      ? {
+          after: {
+            contentText: ' 🔗',
+            color: resolvedColor,
+          },
+        }
+      : {}),
   });
 }
 

@@ -80,6 +80,7 @@ type RegistryOptions = {
   getHeading5Color?: () => string | undefined;
   getHeading6Color?: () => string | undefined;
   getLinkColor?: () => string | undefined;
+  getLinkShowEmoji?: () => boolean;
   getListMarkerColor?: () => string | undefined;
   getInlineCodeColor?: () => string | undefined;
   getInlineCodeBackgroundColor?: () => string | undefined;
@@ -151,7 +152,10 @@ export class DecorationTypeRegistry {
     this.heading4DecorationType = Heading4DecorationType(this.options.getHeading4Color?.());
     this.heading5DecorationType = Heading5DecorationType(this.options.getHeading5Color?.());
     this.heading6DecorationType = Heading6DecorationType(this.options.getHeading6Color?.());
-    this.linkDecorationType = LinkDecorationType(this.options.getLinkColor?.());
+    this.linkDecorationType = LinkDecorationType(
+      this.options.getLinkColor?.(),
+      this.options.getLinkShowEmoji?.() ?? false,
+    );
     this.imageDecorationType = ImageDecorationType(this.options.getImageColor?.());
     this.mentionDecorationType = MentionDecorationType(this.options.getLinkColor?.());
     this.issueReferenceDecorationType = IssueReferenceDecorationType(this.options.getLinkColor?.());
@@ -422,6 +426,16 @@ export class DecorationTypeRegistry {
     );
   }
 
+  /** Recreates link decoration when link color or link emoji setting changes. */
+  recreateLinkDecorationType(): void {
+    this.recreateDecorationType(
+      this.linkDecorationType,
+      () => LinkDecorationType(this.options.getLinkColor?.(), this.options.getLinkShowEmoji?.() ?? false),
+      (t) => { this.linkDecorationType = t; },
+      'link',
+    );
+  }
+
   /**
    * Recreates all decoration types that depend on color settings or theme.
    * Call when config (markdownInlineEditor.colors) or active color theme changes.
@@ -433,7 +447,12 @@ export class DecorationTypeRegistry {
     this.recreateDecorationType(this.heading4DecorationType, () => Heading4DecorationType(this.options.getHeading4Color?.()), (t) => { this.heading4DecorationType = t; }, 'heading4');
     this.recreateDecorationType(this.heading5DecorationType, () => Heading5DecorationType(this.options.getHeading5Color?.()), (t) => { this.heading5DecorationType = t; }, 'heading5');
     this.recreateDecorationType(this.heading6DecorationType, () => Heading6DecorationType(this.options.getHeading6Color?.()), (t) => { this.heading6DecorationType = t; }, 'heading6');
-    this.recreateDecorationType(this.linkDecorationType, () => LinkDecorationType(this.options.getLinkColor?.()), (t) => { this.linkDecorationType = t; }, 'link');
+    this.recreateDecorationType(
+      this.linkDecorationType,
+      () => LinkDecorationType(this.options.getLinkColor?.(), this.options.getLinkShowEmoji?.() ?? false),
+      (t) => { this.linkDecorationType = t; },
+      'link',
+    );
     this.recreateDecorationType(this.blockquoteDecorationType, () => BlockquoteDecorationType(this.options.getBlockquoteColor?.()), (t) => { this.blockquoteDecorationType = t; }, 'blockquote');
     this.recreateDecorationType(this.listItemDecorationType, () => ListItemDecorationType(this.options.getListMarkerColor?.()), (t) => { this.listItemDecorationType = t; }, 'listItem');
     this.recreateDecorationType(this.orderedListItemDecorationType, () => OrderedListItemDecorationType(this.options.getListMarkerColor?.()), (t) => { this.orderedListItemDecorationType = t; }, 'orderedListItem');

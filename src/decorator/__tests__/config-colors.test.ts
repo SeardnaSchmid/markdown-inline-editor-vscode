@@ -192,3 +192,25 @@ describe('config.colors', () => {
     });
   });
 });
+
+describe('config.links.showEmoji', () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  it('defaults to false when unset', () => {
+    mockGet.mockImplementation((key: string, defaultValue?: unknown) => {
+      if (key === 'links.showEmoji') return defaultValue;
+      return undefined;
+    });
+    expect(config.links.showEmoji()).toBe(false);
+  });
+
+  it('returns true when enabled', () => {
+    mockGet.mockImplementation((key: string) => {
+      if (key === 'links.showEmoji') return true;
+      return undefined;
+    });
+    expect(config.links.showEmoji()).toBe(true);
+  });
+});
