@@ -38,6 +38,35 @@ import {
 } from '../decorations';
 import type { DecorationType } from '../parser';
 
+export type DecorationStyleDebugSpec = {
+  textDecoration?: string;
+  colorSource?: string;
+  backgroundColorSource?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  cursor?: string;
+  opacity?: string;
+  isWholeLine?: boolean;
+  borderWidth?: string;
+  borderStyle?: string;
+  borderColorSource?: string;
+  before?: {
+    contentText?: string;
+    colorSource?: string;
+    fontWeight?: string;
+    border?: string;
+    borderColorSource?: string;
+    width?: string;
+    height?: string;
+    textDecoration?: string;
+  };
+  after?: {
+    contentText?: string;
+    colorSource?: string;
+    textDecoration?: string;
+  };
+};
+
 type RegistryOptions = {
   getGhostFaintOpacity: () => number;
   getFrontmatterDelimiterOpacity: () => number;
@@ -174,8 +203,202 @@ export class DecorationTypeRegistry {
     ]);
   }
 
+  /** Debug styles for getDebugStyleMap — rebuilt each call so values match current config. */
+  private buildDebugStyleMap(): Map<DecorationType, DecorationStyleDebugSpec> {
+    return new Map<DecorationType, DecorationStyleDebugSpec>([
+      ['hide', { textDecoration: 'none; display: none;', after: { contentText: '' } }],
+      ['transparent', { colorSource: 'transparent' }],
+      ['ghostFaint', { opacity: String(this.options.getGhostFaintOpacity()) }],
+      ['bold', { fontWeight: 'bold', colorSource: this.options.getEmphasisColor?.() ?? 'default' }],
+      ['italic', { fontStyle: 'italic', colorSource: this.options.getEmphasisColor?.() ?? 'default' }],
+      ['boldItalic', {
+        fontWeight: 'bold',
+        fontStyle: 'italic',
+        colorSource: this.options.getEmphasisColor?.() ?? 'default',
+      }],
+      ['strikethrough', { textDecoration: 'line-through' }],
+      ['code', {
+        colorSource: this.options.getInlineCodeColor?.() ?? 'default',
+        backgroundColorSource: this.options.getInlineCodeBackgroundColor?.() ?? 'theme-aware-default',
+      }],
+      ['codeBlock', {
+        backgroundColorSource: 'textCodeBlock.background',
+        isWholeLine: true,
+      }],
+      ['codeBlockLanguage', {
+        opacity: String(this.options.getCodeBlockLanguageOpacity()),
+        fontStyle: 'italic',
+        textDecoration: 'underline',
+      }],
+      ['heading', { fontWeight: 'bold' }],
+      ['heading1', {
+        textDecoration: 'none; font-size: 180%;',
+        fontWeight: 'bold',
+        colorSource: this.options.getHeading1Color?.() ?? 'default',
+      }],
+      ['heading2', {
+        textDecoration: 'none; font-size: 140%;',
+        fontWeight: 'bold',
+        colorSource: this.options.getHeading2Color?.() ?? 'default',
+      }],
+      ['heading3', {
+        textDecoration: 'none; font-size: 120%;',
+        fontWeight: 'bold',
+        colorSource: this.options.getHeading3Color?.() ?? 'default',
+      }],
+      ['heading4', {
+        textDecoration: 'none; font-size: 110%;',
+        colorSource: this.options.getHeading4Color?.() ?? 'default',
+      }],
+      ['heading5', {
+        textDecoration: 'none; font-size: 100%;',
+        colorSource: this.options.getHeading5Color?.() ?? 'default',
+      }],
+      ['heading6', {
+        textDecoration: 'none; font-size: 90%;',
+        colorSource: this.options.getHeading6Color?.() ?? 'default',
+      }],
+      ['link', {
+        colorSource: this.options.getLinkColor?.() ?? 'textLink.foreground',
+        textDecoration: 'underline',
+        cursor: 'pointer',
+        after: {
+          contentText: ' 🔗',
+          colorSource: this.options.getLinkColor?.() ?? 'textLink.foreground',
+        },
+      }],
+      ['image', {
+        colorSource: this.options.getImageColor?.() ?? 'textLink.foreground',
+        cursor: 'pointer',
+        textDecoration: 'underline; text-decoration-style: dashed; text-decoration-thickness: 1px;',
+        after: {
+          contentText: ' ⬔',
+          colorSource: this.options.getImageColor?.() ?? 'textLink.foreground',
+        },
+      }],
+      ['mention', {
+        colorSource: this.options.getLinkColor?.() ?? 'textLink.foreground',
+        textDecoration: 'underline',
+        cursor: 'pointer',
+      }],
+      ['issueReference', {
+        colorSource: this.options.getLinkColor?.() ?? 'textLink.foreground',
+        textDecoration: 'underline',
+        cursor: 'pointer',
+      }],
+      ['blockquote', {
+        textDecoration: 'none; display: none;',
+        before: {
+          contentText: '│',
+          colorSource: this.options.getBlockquoteColor?.() ?? 'textLink.foreground',
+          fontWeight: 'bold',
+        },
+      }],
+      ['listItem', {
+        textDecoration: 'none; display: none;',
+        before: {
+          contentText: '• ',
+          colorSource: this.options.getListMarkerColor?.() ?? 'editor.foreground',
+          fontWeight: 'bold',
+        },
+      }],
+      ['orderedListItem', {
+        colorSource: this.options.getListMarkerColor?.() ?? 'editor.foreground',
+      }],
+      ['horizontalRule', {
+        textDecoration: 'none; display: none;',
+        isWholeLine: true,
+        borderWidth: '0 0 1px 0',
+        borderStyle: 'solid',
+        borderColorSource: this.options.getHorizontalRuleColor?.() ?? 'editorWidget.border',
+      }],
+      ['checkboxUnchecked', {
+        textDecoration: 'none; display: none;',
+        before: {
+          contentText: ' ',
+          colorSource: this.options.getCheckboxColor?.() ?? 'editor.foreground',
+          width: '1em',
+          height: '1em',
+          border: '1px solid',
+          borderColorSource: this.options.getCheckboxColor?.() ?? 'editor.foreground',
+          textDecoration: 'display: inline-block; box-sizing: border-box; vertical-align: middle; margin-right: -1em; cursor: pointer;',
+        },
+        after: {
+          contentText: ' ',
+          colorSource: this.options.getCheckboxColor?.() ?? 'editor.foreground',
+          textDecoration: `
+        display: inline-block;
+        position: relative;
+        width: 1em;
+        cursor: pointer;
+        margin-right: 0.6em;
+        margin-left: 0.2em;
+      `,
+        },
+      }],
+      ['checkboxChecked', {
+        textDecoration: 'none; display: none;',
+        before: {
+          contentText: ' ',
+          colorSource: this.options.getCheckboxColor?.() ?? 'editor.foreground',
+          width: '1em',
+          height: '1em',
+          border: '1px solid',
+          borderColorSource: this.options.getCheckboxColor?.() ?? 'editor.foreground',
+          textDecoration: 'display: inline-block; box-sizing: border-box; vertical-align: middle; margin-right: -1em; cursor: pointer;',
+        },
+        after: {
+          contentText: '✔',
+          colorSource: this.options.getCheckboxColor?.() ?? 'editor.foreground',
+          textDecoration: `
+        display: inline-block;
+        position: relative;
+        width: 1em;
+        cursor: pointer;
+        margin-right: 0.6em;
+        margin-left: 0.2em;
+      `,
+        },
+      }],
+      ['frontmatter', {
+        backgroundColorSource: 'textCodeBlock.background',
+        isWholeLine: true,
+      }],
+      ['frontmatterDelimiter', {
+        opacity: String(this.options.getFrontmatterDelimiterOpacity()),
+      }],
+      ['emoji', {
+        textDecoration: 'none; display: none;',
+        before: { contentText: '' },
+      }],
+      ['tablePipe', {
+        textDecoration: 'none; display: none;',
+        before: { contentText: '', colorSource: 'editorLineNumber.foreground' },
+      }],
+      ['tableSeparatorPipe', {
+        textDecoration: 'none; display: none;',
+        before: { contentText: '', colorSource: 'editorLineNumber.foreground' },
+      }],
+      ['tableSeparatorDash', {
+        textDecoration: 'none; display: none;',
+        before: { contentText: '', colorSource: 'editorLineNumber.foreground' },
+      }],
+      ['tableCell', {
+        textDecoration: 'none; display: none;',
+        before: { contentText: '' },
+      }],
+      ['selectionOverlay', {
+        backgroundColorSource: 'editor.selectionBackground',
+      }],
+    ]);
+  }
+
   getMap(): Map<DecorationType, TextEditorDecorationType> {
     return this.decorationTypeMap;
+  }
+
+  getDebugStyleMap(): Map<DecorationType, DecorationStyleDebugSpec> {
+    return this.buildDebugStyleMap();
   }
 
   getGhostFaintDecorationType(): TextEditorDecorationType {

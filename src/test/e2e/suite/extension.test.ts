@@ -14,10 +14,68 @@ const EXTENSION_ID = 'CodeSmith.markdown-inline-editor-vscode';
 type DR = { type: string; startPos: number; endPos: number; url?: string };
 type PE = { text: string; decorations: DR[] };
 type ParseCacheExport = { get(doc: vscode.TextDocument): PE };
+type DecorationStyleDebugSpec = {
+  textDecoration?: string;
+  colorSource?: string;
+  backgroundColorSource?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  cursor?: string;
+  opacity?: string;
+  isWholeLine?: boolean;
+  borderWidth?: string;
+  borderStyle?: string;
+  borderColorSource?: string;
+  before?: {
+    contentText?: string;
+    colorSource?: string;
+    fontWeight?: string;
+    border?: string;
+    borderColorSource?: string;
+    width?: string;
+    height?: string;
+    textDecoration?: string;
+  };
+  after?: {
+    contentText?: string;
+    colorSource?: string;
+    textDecoration?: string;
+  };
+};
+type DebugAppliedRangeSnapshot = {
+  startLine: number;
+  startCharacter: number;
+  endLine: number;
+  endCharacter: number;
+  renderOptions?: {
+    beforeContentText?: string;
+    beforeTextDecoration?: string;
+    beforeFontWeight?: string;
+    beforeFontStyle?: string;
+    afterContentText?: string;
+    afterTextDecoration?: string;
+  };
+};
+type DecoratorDebugSnapshot = {
+  documentUri?: string;
+  enabled: boolean;
+  applied: Record<string, DebugAppliedRangeSnapshot[] | undefined>;
+  styles: Record<string, DecorationStyleDebugSpec | undefined>;
+  math?: {
+    enabled: boolean;
+    applied: DebugAppliedRangeSnapshot[];
+    hiddenCount: number;
+  };
+  mermaid?: {
+    rendered: DebugAppliedRangeSnapshot[];
+    indicators: DebugAppliedRangeSnapshot[];
+  };
+};
 type DecoratorExport = {
   isEnabled(): boolean;
   activeEditor: vscode.TextEditor | undefined;
   onApply: ((nonEmptyTypeCount: number) => void) | undefined;
+  getDebugSnapshot(): DecoratorDebugSnapshot;
 };
 type SvgProcessorExport = {
   processSvg: (svgString: string, height: number, maxWidth?: number) => string;
@@ -68,6 +126,102 @@ suite('Extension E2E', () => {
     await delay(500);
     assert.strictEqual(doc.languageId, 'markdown');
     // Reaching here without an unhandled exception means the decorator ran cleanly.
+  });
+
+  test('live decorator snapshot includes rendered visual styles for core markdown constructs', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '**bold** and _italic_ and `code`\n\n# Heading\n\n> blockquote',
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    const snapshot = decoratorApi.getDebugSnapshot();
+    assert.strictEqual(snapshot.documentUri, doc.uri.toString(), 'Expected snapshot for the active document');
+    assert.ok(snapshot.applied.bold?.length, 'Expected bold decorations to be applied to the editor');
+    assert.ok(snapshot.applied.italic?.length, 'Expected italic decorations to be applied to the editor');
+    assert.ok(snapshot.applied.code?.length, 'Expected inline code decorations to be applied to the editor');
+    assert.ok(snapshot.applied.heading1?.length, 'Expected heading decorations to be applied to the editor');
+    assert.ok(snapshot.applied.blockquote?.length, 'Expected blockquote decorations to be applied to the editor');
+    assert.strictEqual(snapshot.styles.bold?.fontWeight, 'bold');
+    assert.strictEqual(snapshot.styles.italic?.fontStyle, 'italic');
+    assert.strictEqual(snapshot.styles.heading1?.textDecoration, 'none; font-size: 180%;');
+    assert.strictEqual(snapshot.styles.blockquote?.before?.contentText, '│');
+    assert.strictEqual(snapshot.styles.code?.backgroundColorSource, 'theme-aware-default');
+  });
+
+  test('heading styling is suppressed on the active line and restored off-line', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '# Active Heading\n\nBody line',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(!snapshot.applied.heading1?.length, 'Expected heading styling to be suppressed on the active heading line');
+
+    await setCursor(editor, 2, 0);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.heading1?.length, 'Expected heading styling to return when cursor leaves the heading line');
+  });
+
+  test('active-line markdown markers switch to ghost-faint instead of hidden', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      // Trailing text keeps the cursor outside the emphasis scope while still on the line (ghost state).
+      content: '**bold** after\nplain line',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(500);
+    await setCursor(editor, 0, '**bold** after'.length);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.ghostFaint?.length, 'Expected ghost-faint marker rendering on the active markdown line');
+    assert.ok(!snapshot.applied.hide?.length, 'Expected hidden syntax markers to be suppressed on the active line');
+
+    await setCursor(editor, 1, 0);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.hide?.length, 'Expected hidden syntax markers to return when cursor leaves the line');
+  });
+
+  test('cursor inside a bold scope reveals raw markers while keeping semantic bold styling', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'Lead line\n**bold text**',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.hide?.length, 'Expected hidden marker decorations while cursor is outside the bold scope');
+
+    await setCursor(editor, 1, 4);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(!snapshot.applied.hide?.length, 'Expected raw bold markers when cursor enters the bold scope');
+    assert.ok(snapshot.applied.bold?.length, 'Expected semantic bold styling to remain applied');
+  });
+
+  test('cursor inside inline code reveals raw markers while keeping code styling', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'Lead line\n`inline code`',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.transparent?.length, 'Expected transparent inline-code markers while cursor is outside the scope');
+
+    await setCursor(editor, 1, 3);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(!snapshot.applied.transparent?.length, 'Expected raw inline-code markers when cursor enters the code scope');
+    assert.ok(snapshot.applied.code?.length, 'Expected semantic inline-code styling to remain applied');
   });
 
   test('toggle command executes without error on active markdown editor', async () => {
@@ -168,6 +322,27 @@ suite('Extension E2E', () => {
     assert.strictEqual(doc.languageId, 'markdown');
   });
 
+  test('#47 — checkbox decorations expose checked and unchecked visual payloads', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '\n- [ ] unchecked task\n- [x] checked task',
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    const snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.checkboxUnchecked?.length, 'Expected unchecked checkbox decoration to be applied');
+    assert.ok(snapshot.applied.checkboxChecked?.length, 'Expected checked checkbox decoration to be applied');
+    assert.strictEqual(snapshot.styles.checkboxUnchecked?.textDecoration, 'none; display: none;');
+    assert.strictEqual(snapshot.styles.checkboxUnchecked?.before?.border, '1px solid');
+    assert.strictEqual(snapshot.styles.checkboxChecked?.after?.contentText, '✔');
+    assert.ok(
+      snapshot.styles.checkboxChecked?.after?.textDecoration?.includes('cursor: pointer'),
+      'Expected checked checkbox visual payload to keep pointer cursor styling'
+    );
+  });
+
   // Regression for issue #55:
   // GFM tables were not decorated; the parser had boundary issues with table
   // detection. Fix: remark-gfm table parsing with visual grid decorations.
@@ -208,6 +383,90 @@ suite('Extension E2E', () => {
     await vscode.window.showTextDocument(doc);
     await delay(500);
     assert.strictEqual(doc.languageId, 'markdown');
+  });
+
+  test('link and image decorations expose their live visual affordances', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '[Visit Example](https://example.com)\n\n![Diagram](https://example.com/diagram.png)',
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    const snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.link?.length, 'Expected link decoration to be applied');
+    assert.ok(snapshot.applied.image?.length, 'Expected image decoration to be applied');
+    assert.strictEqual(snapshot.styles.link?.textDecoration, 'underline');
+    assert.strictEqual(snapshot.styles.link?.cursor, 'pointer');
+    assert.strictEqual(snapshot.styles.link?.after?.contentText, ' 🔗');
+    assert.ok(
+      snapshot.styles.image?.textDecoration?.includes('text-decoration-style: dashed'),
+      'Expected image decoration to use dashed underline styling'
+    );
+    assert.strictEqual(snapshot.styles.image?.after?.contentText, ' ⬔');
+  });
+
+  test('emoji shortcode replacement renders off-line and reveals raw shortcode on focus', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'neutral line\n:tada:',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.emoji?.length, 'Expected emoji replacement decoration to be applied off the active line');
+    assert.strictEqual(snapshot.applied.emoji?.[0].renderOptions?.beforeContentText, '🎉');
+
+    await setCursor(editor, 1, 3);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(!snapshot.applied.emoji?.length, 'Expected raw emoji shortcode to be shown when cursor enters the shortcode scope');
+  });
+
+  test('table replacements render off-table and reveal raw table when cursor enters the table', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'neutral line\n| A | B |\n| - | - |\n| 1 | 2 |',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.tablePipe?.length, 'Expected table pipe replacements to be applied off the active table block');
+    assert.strictEqual(snapshot.applied.tablePipe?.[0].renderOptions?.beforeContentText, '│');
+
+    await setCursor(editor, 1, 2);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(!snapshot.applied.tablePipe?.length, 'Expected raw table pipes when cursor enters the table block');
+    assert.ok(!snapshot.applied.tableCell?.length, 'Expected raw table cells when cursor enters the table block');
+  });
+
+  test('table cell replacements carry padded content and formatting payloads', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'neutral line\n| Header |\n|--------|\n| **bold** |',
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(500);
+
+    const snapshot = decoratorApi.getDebugSnapshot();
+    const cellWithBold = snapshot.applied.tableCell?.find((entry) =>
+      entry.renderOptions?.beforeContentText?.includes('bold')
+    );
+    assert.ok(cellWithBold, 'Expected a rendered table cell replacement for the bold cell');
+    assert.ok(
+      cellWithBold.renderOptions?.beforeContentText?.startsWith('\u00A0'),
+      'Expected table cell replacement to preserve left padding'
+    );
+    assert.ok(
+      cellWithBold.renderOptions?.beforeContentText?.endsWith('\u00A0'),
+      'Expected table cell replacement to preserve right padding'
+    );
+    assert.strictEqual(cellWithBold.renderOptions?.beforeFontWeight, 'bold');
   });
 
   // Regression for issue #30:
@@ -950,6 +1209,216 @@ suite('Extension E2E', () => {
       'Expected heading1 decoration in cache after inserting "# Heading"'
     );
   });
+
+  test('selection over a fenced code block adds a visible selection overlay decoration', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '```ts\nconst x = 1;\n```',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(300);
+
+    await setSelection(editor, 0, 0, 2, 3);
+    const snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.codeBlock?.length, 'Expected code block background decoration to remain applied');
+    assert.ok(snapshot.applied.selectionOverlay?.length, 'Expected selection overlay decoration over the selected code block');
+    assert.strictEqual(snapshot.styles.selectionOverlay?.backgroundColorSource, 'editor.selectionBackground');
+  });
+
+  test('selection over frontmatter adds a visible selection overlay decoration', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '---\ntitle: hello\n---\n\nBody',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(300);
+
+    await setSelection(editor, 0, 0, 2, 3);
+    const snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.frontmatter?.length, 'Expected frontmatter background decoration to remain applied');
+    assert.ok(snapshot.applied.selectionOverlay?.length, 'Expected selection overlay decoration over frontmatter');
+  });
+
+  test('multi-cursor active lines ghost markdown markers on every active line', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const line0 = '**bold** after';
+    const line2 = '_italic_ after';
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: `${line0}\nplain\n${line2}`,
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(300);
+
+    // Cursors after the inline constructs (same line, outside scope) → ghost-faint markers on both lines.
+    editor.selections = [
+      new vscode.Selection(new vscode.Position(0, line0.length), new vscode.Position(0, line0.length)),
+      new vscode.Selection(new vscode.Position(2, line2.length), new vscode.Position(2, line2.length)),
+    ];
+    await delay(250);
+
+    const snapshot = decoratorApi.getDebugSnapshot();
+    const ghostRanges = snapshot.applied.ghostFaint ?? [];
+    assert.ok(ghostRanges.length >= 4, `Expected ghost markers for both active markdown lines, got ${ghostRanges.length}`);
+    assert.ok(
+      ghostRanges.some((range) => range.startLine === 0) && ghostRanges.some((range) => range.startLine === 2),
+      'Expected ghost markers on both cursor lines'
+    );
+  });
+
+  test('non-empty selection across a bold scope reveals raw markers on the selected range', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'neutral\n**bold**',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(300);
+
+    await setSelection(editor, 1, 0, 1, 8);
+    const snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(!snapshot.applied.hide?.length, 'Expected hidden markers to disappear for the selected bold scope');
+    assert.ok(snapshot.applied.bold?.length, 'Expected semantic bold styling to stay applied during selection');
+  });
+
+  test('config changes update live link color styling and emoji enablement', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const decorator = decoratorApi;
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'neutral\n[link](https://example.com)\n:tada:',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(400);
+
+    await withConfig('colors.link', '#ff0000', async () => {
+      await setCursor(editor, 0, 0);
+      const snapshot = decorator.getDebugSnapshot();
+      assert.strictEqual(snapshot.styles.link?.colorSource, '#ff0000');
+    });
+
+    await withConfig('emojis.enabled', false, async () => {
+      await setCursor(editor, 0, 0);
+      const snapshot = decorator.getDebugSnapshot();
+      assert.ok(!snapshot.applied.emoji?.length, 'Expected emoji decorations to disappear when emojis are disabled');
+    });
+  });
+
+  test('config changes update ghost opacity and math enablement in the live snapshot', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const decorator = decoratorApi;
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '**bold**\n\n$x$',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(400);
+
+    await withConfig('decorations.ghostFaintOpacity', 0.7, async () => {
+      await setCursor(editor, 0, 1);
+      const snapshot = decorator.getDebugSnapshot();
+      assert.strictEqual(snapshot.styles.ghostFaint?.opacity, '0.7');
+    });
+
+    await withConfig('math.enabled', false, async () => {
+      await setCursor(editor, 0, 0);
+      const snapshot = decorator.getDebugSnapshot();
+      assert.strictEqual(snapshot.math?.enabled, false);
+      assert.strictEqual(snapshot.math?.applied.length, 0);
+    });
+  });
+
+  test('live decorator snapshot updates after an edit, not just the parse cache', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'Plain text',
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(300);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(!snapshot.applied.heading1?.length, 'Unexpected heading styling before edit');
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(doc.uri, new vscode.Position(0, 0), '# Heading\n\n');
+    await vscode.workspace.applyEdit(edit);
+    await delay(700);
+
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.applied.heading1?.length, 'Expected live heading styling after editing in a heading');
+  });
+
+  test('math decorations render outside scope and reveal raw LaTeX inside scope', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'neutral\n$x$\n\n```math\nE=mc^2\n```',
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(700);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok((snapshot.math?.applied.length ?? 0) >= 2, 'Expected inline and fenced math decorations outside their scopes');
+    assert.strictEqual(snapshot.math?.hiddenCount, 0);
+
+    await setCursor(editor, 1, 1);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.strictEqual(snapshot.math?.hiddenCount, 1, 'Expected inline math to reveal raw content when cursor enters its scope');
+
+    await setCursor(editor, 4, 1);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.strictEqual(snapshot.math?.hiddenCount, 1, 'Expected fenced math to reveal raw content when cursor enters its scope');
+  });
+
+  test('mermaid decorations render outside the block and disappear inside the block', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: [
+        'neutral',
+        '```mermaid',
+        'flowchart LR',
+        '  A --> B',
+        '```',
+      ].join('\n'),
+    });
+    const editor = await vscode.window.showTextDocument(doc);
+    await delay(1200);
+
+    let snapshot = decoratorApi.getDebugSnapshot();
+    assert.ok(snapshot.mermaid && snapshot.mermaid.rendered.length > 0, 'Expected rendered mermaid decorations outside the block');
+    assert.ok(snapshot.mermaid && snapshot.mermaid.indicators.length > 0, 'Expected mermaid hover indicators outside the block');
+
+    await setCursor(editor, 2, 1);
+    await delay(800);
+    snapshot = decoratorApi.getDebugSnapshot();
+    assert.strictEqual(snapshot.mermaid?.rendered.length, 0, 'Expected mermaid rendering to disappear when cursor enters the block');
+    assert.strictEqual(snapshot.mermaid?.indicators.length, 0, 'Expected mermaid indicators to disappear when cursor enters the block');
+  });
+
+  test('diff-mode disables live decorations when diff decorations are turned off', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const decorator = decoratorApi;
+    await withConfig('defaultBehaviors.diffView.applyDecorations', false, async () => {
+      await withTwoTempFiles(
+        '# Left\n**bold**',
+        '# Right\n**bold**',
+        async (leftUri, rightUri) => {
+          await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, 'E2E Diff');
+          await delay(1200);
+          const snapshot = decorator.getDebugSnapshot();
+          assert.ok(
+            !snapshot.applied.bold?.length && !snapshot.applied.hide?.length && !snapshot.applied.ghostFaint?.length,
+            'Expected no live markdown decorations while diff rendering is disabled'
+          );
+          await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        }
+      );
+    });
+  });
 });
 
 function delay(ms: number): Promise<void> {
@@ -982,4 +1451,70 @@ async function withTempFile(
   } finally {
     try { fs.unlinkSync(tmpPath); } catch { /* ignore cleanup errors */ }
   }
+}
+
+async function withTwoTempFiles(
+  leftContent: string,
+  rightContent: string,
+  fn: (leftUri: vscode.Uri, rightUri: vscode.Uri) => Promise<void>
+): Promise<void> {
+  const leftPath = path.join(
+    os.tmpdir(),
+    `mdtest-left-${Date.now()}-${Math.random().toString(36).slice(2)}.md`
+  );
+  const rightPath = path.join(
+    os.tmpdir(),
+    `mdtest-right-${Date.now()}-${Math.random().toString(36).slice(2)}.md`
+  );
+  fs.writeFileSync(leftPath, leftContent, 'utf8');
+  fs.writeFileSync(rightPath, rightContent, 'utf8');
+  try {
+    await fn(vscode.Uri.file(leftPath), vscode.Uri.file(rightPath));
+  } finally {
+    try { fs.unlinkSync(leftPath); } catch { /* ignore cleanup errors */ }
+    try { fs.unlinkSync(rightPath); } catch { /* ignore cleanup errors */ }
+  }
+}
+
+async function withConfig<T>(
+  key: string,
+  value: unknown,
+  fn: () => Promise<T>
+): Promise<T> {
+  const configuration = vscode.workspace.getConfiguration('markdownInlineEditor');
+  const previous = configuration.get(key);
+  await configuration.update(key, value, vscode.ConfigurationTarget.Global);
+  await delay(500);
+  try {
+    return await fn();
+  } finally {
+    await configuration.update(key, previous, vscode.ConfigurationTarget.Global);
+    await delay(500);
+  }
+}
+
+async function setCursor(
+  editor: vscode.TextEditor,
+  line: number,
+  character: number
+): Promise<void> {
+  const position = new vscode.Position(line, character);
+  editor.selection = new vscode.Selection(position, position);
+  editor.selections = [editor.selection];
+  await delay(250);
+}
+
+async function setSelection(
+  editor: vscode.TextEditor,
+  startLine: number,
+  startCharacter: number,
+  endLine: number,
+  endCharacter: number
+): Promise<void> {
+  editor.selection = new vscode.Selection(
+    new vscode.Position(startLine, startCharacter),
+    new vscode.Position(endLine, endCharacter)
+  );
+  editor.selections = [editor.selection];
+  await delay(250);
 }

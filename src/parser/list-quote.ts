@@ -108,7 +108,7 @@ export function processListItem(
         ? parentList.children.indexOf(node)
         : -1;
       const autoNumber = itemIndex >= 0
-        ? (parentList.start ?? 1) + itemIndex
+        ? (parentList?.start ?? 1) + itemIndex
         : parseInt(text.slice(markerStart, numEnd), 10);
       const writtenNumber = parseInt(text.slice(markerStart, numEnd), 10);
       const replacement = `${autoNumber}${delimiter} `;

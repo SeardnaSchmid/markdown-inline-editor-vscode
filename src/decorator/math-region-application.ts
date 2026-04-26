@@ -8,7 +8,7 @@ export function applyMathDecorationsForEditor(
   mathRegions: MathRegion[],
   normalizedText: string,
   mathDecorations: MathDecorations
-): void {
+): Array<{ region: MathRegion; range: ReturnType<typeof createRange> }> {
   const regionsWithRanges = mathRegions.map((region) => {
     const inside = isSelectionOrCursorInsideOffsets(
       region.startPos,
@@ -24,4 +24,5 @@ export function applyMathDecorationsForEditor(
   });
 
   mathDecorations.apply(editor, regionsWithRanges);
+  return regionsWithRanges;
 }

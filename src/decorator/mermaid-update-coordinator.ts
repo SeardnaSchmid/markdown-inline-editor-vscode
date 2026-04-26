@@ -74,11 +74,11 @@ export class MermaidUpdateCoordinator {
     normalizedText: string,
     documentVersion: number,
     hoverIndicatorDecorationType: { dispose(): void } & { key?: string },
-  ): Promise<void> {
+  ): Promise<{ rendered: Range[]; indicators: Range[] } | undefined> {
     if (mermaidBlocks.length === 0) {
       this.mermaidDecorations.clear(editor);
       editor.setDecorations(hoverIndicatorDecorationType as never, []);
-      return;
+      return { rendered: [], indicators: [] };
     }
 
     const token = ++this.mermaidUpdateToken;
@@ -167,10 +167,14 @@ export class MermaidUpdateCoordinator {
     }
 
     if (token !== this.mermaidUpdateToken || editor.document.version !== documentVersion) {
-      return;
+      return undefined;
     }
 
     this.mermaidDecorations.apply(editor, rangesByKey, dataUrisByKey);
     editor.setDecorations(hoverIndicatorDecorationType as never, indicatorRanges);
+    return {
+      rendered: [...rangesByKey.values()].flat(),
+      indicators: indicatorRanges,
+    };
   }
 }

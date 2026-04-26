@@ -11,7 +11,7 @@ import {
 } from './decorator/editor-decoration-applier';
 import { FileDecorationStateStore } from './decorator/file-decoration-state';
 import { MermaidUpdateCoordinator } from './decorator/mermaid-update-coordinator';
-import { DecorationTypeRegistry } from './decorator/decoration-type-registry';
+import { DecorationStyleDebugSpec, DecorationTypeRegistry } from './decorator/decoration-type-registry';
 import { filterDecorationsForEditor, ScopeEntry } from './decorator/visibility-model';
 import { handleCheckboxClick } from './decorator/checkbox-toggle';
 import { MermaidDiagramDecorations } from './decorator/mermaid-diagram-decorations';
@@ -31,6 +31,40 @@ const PERFORMANCE_CONSTANTS = {
   MERMAID_MAX_CONCURRENCY: 4,
 } as const;
 
+type DebugDecorationType = DecorationType | 'ghostFaint';
+
+type DebugRenderOptionsSnapshot = {
+  beforeContentText?: string;
+  beforeTextDecoration?: string;
+  beforeFontWeight?: string;
+  beforeFontStyle?: string;
+  afterContentText?: string;
+  afterTextDecoration?: string;
+};
+
+type DebugAppliedRangeSnapshot = {
+  startLine: number;
+  startCharacter: number;
+  endLine: number;
+  endCharacter: number;
+  renderOptions?: DebugRenderOptionsSnapshot;
+};
+
+export type DecoratorDebugSnapshot = {
+  documentUri?: string;
+  enabled: boolean;
+  applied: Partial<Record<DebugDecorationType, DebugAppliedRangeSnapshot[]>>;
+  styles: Partial<Record<DebugDecorationType, DecorationStyleDebugSpec>>;
+  math?: {
+    enabled: boolean;
+    applied: DebugAppliedRangeSnapshot[];
+    hiddenCount: number;
+  };
+  mermaid?: {
+    rendered: DebugAppliedRangeSnapshot[];
+    indicators: DebugAppliedRangeSnapshot[];
+  };
+};
 
 /**
  * Manages the application of text decorations to markdown documents in VS Code.
@@ -56,6 +90,20 @@ export class Decorator {
    * Undefined in production; never called when decorations are disabled.
    */
   onApply: ((nonEmptyTypeCount: number) => void) | undefined = undefined;
+  private lastDebugSnapshot: DecoratorDebugSnapshot = {
+    enabled: true,
+    applied: {},
+    styles: {},
+    math: {
+      enabled: true,
+      applied: [],
+      hiddenCount: 0,
+    },
+    mermaid: {
+      rendered: [],
+      indicators: [],
+    },
+  };
 
   private parseCache: MarkdownParseCache;
 
@@ -269,6 +317,21 @@ export class Decorator {
     this.mermaidDecorations.clear(this.activeEditor);
     this.mathDecorations.clear(this.activeEditor);
     this.activeEditor.setDecorations(this.mermaidHoverIndicatorDecorationType, []);
+    this.lastDebugSnapshot = {
+      documentUri: this.activeEditor.document.uri.toString(),
+      enabled: this.isEnabled(),
+      applied: {},
+      styles: this.buildDebugStylesSnapshot(),
+      math: {
+        enabled: config.math.enabled(),
+        applied: [],
+        hiddenCount: 0,
+      },
+      mermaid: {
+        rendered: [],
+        indicators: [],
+      },
+    };
   }
 
   /**
@@ -329,6 +392,11 @@ export class Decorator {
       if (this.activeEditor) {
         this.mathDecorations.clear(this.activeEditor);
       }
+      this.lastDebugSnapshot.math = {
+        enabled: config.math.enabled(),
+        applied: [],
+        hiddenCount: 0,
+      };
     }
     void this.updateMermaidDiagrams(mermaidBlocks, text, document.version);
     if (config.debug.performanceEnabled()) {
@@ -353,12 +421,19 @@ export class Decorator {
    */
   private applyMathDecorations(mathRegions: MathRegion[], normalizedText: string): void {
     if (!this.activeEditor) return;
-    applyMathDecorationsForEditor(
+    const applied = applyMathDecorationsForEditor(
       this.activeEditor,
       mathRegions,
       normalizedText,
       this.mathDecorations
     );
+    this.lastDebugSnapshot.math = {
+      enabled: config.math.enabled(),
+      applied: applied
+        .filter((entry) => entry.range !== null)
+        .map((entry) => this.toDebugAppliedRangeSnapshot(entry.range!)),
+      hiddenCount: applied.filter((entry) => entry.range === null).length,
+    };
   }
 
   /**
@@ -440,13 +515,19 @@ export class Decorator {
     }
 
     const editor = this.activeEditor;
-    await this.mermaidCoordinator.update(
+    const result = await this.mermaidCoordinator.update(
       editor,
       mermaidBlocks,
       text,
       documentVersion,
       this.mermaidHoverIndicatorDecorationType
     );
+    if (result) {
+      this.lastDebugSnapshot.mermaid = {
+        rendered: result.rendered.map((range) => this.toDebugAppliedRangeSnapshot(range)),
+        indicators: result.indicators.map((range) => this.toDebugAppliedRangeSnapshot(range)),
+      };
+    }
   }
 
   private isSelectionOrCursorInsideOffsets(
@@ -504,6 +585,81 @@ export class Decorator {
       return;
     }
     applyFilteredDecorations(this.activeEditor, filteredDecorations, this.decorationTypes, this.onApply);
+    const snapshotDecorations = new Map(filteredDecorations);
+    if (!config.emojis.enabled()) {
+      snapshotDecorations.delete('emoji');
+    }
+    this.lastDebugSnapshot = {
+      ...this.lastDebugSnapshot,
+      documentUri: this.activeEditor.document.uri.toString(),
+      enabled: this.isEnabled(),
+      applied: this.buildAppliedDebugSnapshot(snapshotDecorations),
+      styles: this.buildDebugStylesSnapshot(),
+    };
+  }
+
+  /**
+   * Returns the latest debug snapshot of what the decorator applied to the active editor.
+   * Intended for E2E tests only.
+   */
+  getDebugSnapshot(): DecoratorDebugSnapshot {
+    return {
+      documentUri: this.lastDebugSnapshot.documentUri,
+      enabled: this.lastDebugSnapshot.enabled,
+      applied: { ...this.lastDebugSnapshot.applied },
+      styles: { ...this.lastDebugSnapshot.styles },
+      math: this.lastDebugSnapshot.math
+        ? {
+            enabled: this.lastDebugSnapshot.math.enabled,
+            applied: [...this.lastDebugSnapshot.math.applied],
+            hiddenCount: this.lastDebugSnapshot.math.hiddenCount,
+          }
+        : undefined,
+      mermaid: this.lastDebugSnapshot.mermaid
+        ? {
+            rendered: [...this.lastDebugSnapshot.mermaid.rendered],
+            indicators: [...this.lastDebugSnapshot.mermaid.indicators],
+          }
+        : undefined,
+    };
+  }
+
+  private buildAppliedDebugSnapshot(
+    decorations: Map<DecorationType, Array<Range | DecorationOptions>>
+  ): Partial<Record<DebugDecorationType, DebugAppliedRangeSnapshot[]>> {
+    const applied: Partial<Record<DebugDecorationType, DebugAppliedRangeSnapshot[]>> = {};
+    for (const [type, ranges] of decorations.entries()) {
+      if (ranges.length === 0) {
+        continue;
+      }
+      applied[type] = ranges.map((rangeOrOptions) => this.toDebugAppliedRangeSnapshot(rangeOrOptions));
+    }
+    return applied;
+  }
+
+  private buildDebugStylesSnapshot(): Partial<Record<DebugDecorationType, DecorationStyleDebugSpec>> {
+    return Object.fromEntries(this.decorationTypes.getDebugStyleMap().entries()) as Partial<Record<DebugDecorationType, DecorationStyleDebugSpec>>;
+  }
+
+  private toDebugAppliedRangeSnapshot(rangeOrOptions: Range | DecorationOptions): DebugAppliedRangeSnapshot {
+    const range = rangeOrOptions instanceof Range ? rangeOrOptions : rangeOrOptions.range;
+    const snapshot: DebugAppliedRangeSnapshot = {
+      startLine: range.start.line,
+      startCharacter: range.start.character,
+      endLine: range.end.line,
+      endCharacter: range.end.character,
+    };
+    if (!(rangeOrOptions instanceof Range) && rangeOrOptions.renderOptions) {
+      snapshot.renderOptions = {
+        beforeContentText: rangeOrOptions.renderOptions.before?.contentText,
+        beforeTextDecoration: rangeOrOptions.renderOptions.before?.textDecoration,
+        beforeFontWeight: rangeOrOptions.renderOptions.before?.fontWeight,
+        beforeFontStyle: rangeOrOptions.renderOptions.before?.fontStyle,
+        afterContentText: rangeOrOptions.renderOptions.after?.contentText,
+        afterTextDecoration: rangeOrOptions.renderOptions.after?.textDecoration,
+      };
+    }
+    return snapshot;
   }
 
   /**
