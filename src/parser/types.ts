@@ -15,6 +15,7 @@ export interface DecorationRange {
   issueNumber?: number;
   ownerRepo?: string;
   orderedListMarkerMismatch?: boolean;
+  nestSteps?: number;
 }
 
 export interface ScopeRange {
@@ -80,4 +81,5 @@ export type DecorationType =
   | "tableSeparatorDash"
   | "tableCell"
   | "mention"
-  | "issueReference";
+  | "issueReference"
+  | "headingNest";

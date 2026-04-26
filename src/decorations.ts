@@ -264,6 +264,14 @@ export function EmojiDecorationType() {
  *
  * @returns {vscode.TextEditorDecorationType} A decoration type for headings
  */
+/**
+ * Base type for per-line heading outline indent. Actual width and guide line come from
+ * per-range `renderOptions` (see visibility model).
+ */
+export function HeadingNestDecorationType() {
+  return window.createTextEditorDecorationType({});
+}
+
 export function HeadingDecorationType() {
   return window.createTextEditorDecorationType({
     fontWeight: 'bold',

@@ -79,6 +79,45 @@ export const config = {
         .get<boolean>('orderedLists.warnWhenSourceNumberDiffers', true);
     },
   },
+  headings: {
+    nest: {
+      enabled(): boolean {
+        return vscode.workspace
+          .getConfiguration(SECTION)
+          .get<boolean>('headings.nest.enabled', false);
+      },
+      /** Indent width per heading level step, in `ch` units (matches editor character width). */
+      indentPerLevelCh(): number {
+        const value = vscode.workspace
+          .getConfiguration(SECTION)
+          .get<number>('headings.nest.indentPerLevelCh', 1.25);
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+          return 1.25;
+        }
+        return Math.min(6, Math.max(0, value));
+      },
+      nestContent(): boolean {
+        return vscode.workspace
+          .getConfiguration(SECTION)
+          .get<boolean>('headings.nest.nestContent', true);
+      },
+      showIndentGuides(): boolean {
+        return vscode.workspace
+          .getConfiguration(SECTION)
+          .get<boolean>('headings.nest.showIndentGuides', false);
+      },
+      /** Headings deeper than this use the same indent as this level (1-6). */
+      maxLevel(): number {
+        const value = vscode.workspace
+          .getConfiguration(SECTION)
+          .get<number>('headings.nest.maxLevel', 6);
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+          return 6;
+        }
+        return Math.min(6, Math.max(1, Math.round(value)));
+      },
+    },
+  },
   mentions: {
     /** If set, overrides GitHub context: true = force links on, false = force off. Unset = use git remote auto-detect. */
     linksEnabled(): boolean | undefined {

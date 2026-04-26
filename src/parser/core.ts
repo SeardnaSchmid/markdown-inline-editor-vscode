@@ -50,6 +50,7 @@ import {
   processStrikethrough as processStrikethroughHelper,
   processStrong as processStrongHelper,
 } from "./inline-formatting";
+import { addHeadingNestDecorations as addHeadingNestDecorationsHelper } from "./heading-nest";
 import { processCodeBlock as processCodeBlockHelper } from "./code-blocks";
 import {
   processBlockquote as processBlockquoteHelper,
@@ -181,6 +182,7 @@ export class MarkdownParser {
 
       // Process AST nodes and extract decorations + scopes
       this.processAST(ast, normalizedText, decorations, scopes, mermaidBlocks);
+      addHeadingNestDecorationsHelper(ast, normalizedText, decorations, scopes, this.visit);
 
       // Handle edge cases: empty image alt text that remark doesn't parse as Image node
       this.handleEmptyImageAlt(normalizedText, decorations);

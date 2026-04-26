@@ -1,5 +1,6 @@
 import { Range, ThemeColor, type DecorationOptions, type Position, type TextEditor } from 'vscode';
 import type { DecorationRange, DecorationType } from '../parser';
+import { config } from '../config';
 import { isMarkerDecorationType } from './decoration-categories';
 
 export type ScopeEntry = {
@@ -148,6 +149,39 @@ export function filterDecorationsForEditor(
 
     if (headingTypes.has(decoration.type) && isActiveLine) {
       // Show raw heading text (no heading styling) on active lines
+      continue;
+    }
+
+    if (decoration.type === 'headingNest') {
+      const steps = decoration.nestSteps ?? 0;
+      if (steps <= 0) {
+        continue;
+      }
+      if (isActiveLine) {
+        continue;
+      }
+      const indentCh = config.headings.nest.indentPerLevelCh();
+      const widthCh = steps * indentCh;
+      // Never use `border: 1px solid` on a wide `before` attachment: VS Code draws
+      // top and bottom edges across the full width, which looks like horizontal "underscore" lines.
+      const before: {
+        contentText: string;
+        width: string;
+        textDecoration?: string;
+      } = {
+        contentText: '',
+        width: `${widthCh}ch`,
+      };
+      if (config.headings.nest.showIndentGuides()) {
+        before.textDecoration =
+          'none; box-shadow: inset 1px 0 0 0 var(--vscode-editorIndentGuide-background);';
+      }
+      const ranges = filtered.get(decoration.type) || [];
+      ranges.push({
+        range,
+        renderOptions: { before },
+      });
+      filtered.set(decoration.type, ranges);
       continue;
     }
 

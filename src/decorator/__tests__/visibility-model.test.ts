@@ -7,6 +7,7 @@ vi.mock('../../parser', () => ({
 import { filterDecorationsForEditor } from '../visibility-model';
 import type { ScopeEntry } from '../visibility-model';
 import type { DecorationRange } from '../../parser';
+import { config } from '../../config';
 import { TextDocument, TextEditor, Selection, Position, Uri, Range } from '../../test/__mocks__/vscode';
 
 function makeEditor(text: string, cursorLine: number, cursorChar: number) {
@@ -150,6 +151,72 @@ describe('table decoration rendering', () => {
     expect(cells).toBeDefined();
     expect(cells[0].renderOptions?.before?.contentText).toBe(' bold ');
     expect(cells[0].renderOptions?.before?.fontWeight).toBe('bold');
+  });
+});
+
+describe('headingNest', () => {
+  beforeEach(() => {
+    vi.spyOn(config.headings.nest, 'indentPerLevelCh').mockReturnValue(1);
+    vi.spyOn(config.headings.nest, 'showIndentGuides').mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders before width from nestSteps when cursor is not on that line', () => {
+    const text = '## H\n\nx';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 4, type: 'headingNest', nestSteps: 2 } as any,
+    ];
+    const editor = makeEditor(text, 2, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const nests = result.get('headingNest') as any[];
+    expect(nests?.length).toBe(1);
+    expect(nests[0].renderOptions?.before?.width).toBe('2ch');
+  });
+
+  it('omits headingNest on the active line', () => {
+    const text = '## H\n';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 4, type: 'headingNest', nestSteps: 2 } as any,
+    ];
+    const editor = makeEditor(text, 0, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    expect(result.has('headingNest')).toBe(false);
+  });
+
+  it('uses inset box-shadow for indent guides instead of a full border', () => {
+    vi.spyOn(config.headings.nest, 'showIndentGuides').mockReturnValue(true);
+    const text = '## H\n\nx';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 4, type: 'headingNest', nestSteps: 1 } as any,
+    ];
+    const editor = makeEditor(text, 2, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const before = (result.get('headingNest') as any[])[0].renderOptions.before;
+    expect(before.textDecoration).toContain('box-shadow');
+    expect(before.textDecoration).toContain('inset');
+    expect(before.border).toBeUndefined();
+    expect(before.borderColor).toBeUndefined();
   });
 });
 
