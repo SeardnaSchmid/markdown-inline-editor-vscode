@@ -278,6 +278,19 @@ suite('Extension E2E', () => {
     assert.strictEqual(doc.languageId, 'markdown');
   });
 
+  // Issue #31: ordered list auto-numbering
+  // Ordered list markers should be hidden and replaced with auto-calculated numbers.
+  test('#31 — ordered list auto-numbering decorates without error', async () => {
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '1. First item\n1. Second item\n1. Third item\n\nNested:\n1. Outer\n   1. Inner A\n   1. Inner B\n1. Outer again',
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(500);
+    assert.strictEqual(doc.languageId, 'markdown');
+    // Extension must not throw while decorating ordered lists with auto-numbering.
+  });
+
   // Edge case: an empty markdown document should not throw.
   test('empty markdown document decorates without error', async () => {
     const doc = await vscode.workspace.openTextDocument({

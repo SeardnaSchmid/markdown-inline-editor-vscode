@@ -10,6 +10,7 @@ import type {
   Image,
   Delete,
   Blockquote,
+  List,
   ListItem,
   ThematicBreak,
   Text,
@@ -45,6 +46,8 @@ export interface DecorationRange {
   slug?: string; // For type 'mention': segment after @ (e.g. username, org/team). Used by link provider to resolve URL. 
   issueNumber?: number; // For type 'issueReference': issue/PR number. Used by link provider to resolve URL.
   ownerRepo?: string; // For type 'issueReference' when repo-scoped (@user/repo#456): the "user/repo" part.
+  /** True when the source marker number differs from the computed replacement (ordered lists only). */
+  orderedListMarkerMismatch?: boolean;
 }
 
 /**
@@ -1861,7 +1864,7 @@ export class MarkdownParser {
    * Processes a list item node.
    *
    * Replaces unordered list markers (-, *, +) with a bullet point (•).
-   * Keeps ordered list markers (1., 2., etc.) as-is (no decoration).
+   * Ordered lists: optionally hides markers and shows computed numbers (see `orderedLists.autoNumber`).
    * Detects and decorates checkboxes ([ ] or [x]) after the marker.
    * Supports both unordered lists (-, *, +) and ordered lists (1., 2., etc.).
    */
@@ -1940,13 +1943,48 @@ export class MarkdownParser {
 
       // Check if followed by '.' or ')'
       if (numEnd < end && (text[numEnd] === "." || text[numEnd] === ")")) {
+        const delimiter = text[numEnd];
         markerEnd = numEnd + 1;
         // Skip optional space after marker
         if (markerEnd < end && text[markerEnd] === " ") {
           markerEnd++;
         }
 
-        // For ordered lists: only add checkbox decoration if present, otherwise apply color styling
+        // Compute auto-numbered replacement from position in parent list
+        const parentList = ancestors[0] as List | undefined;
+        const itemIndex = parentList?.children
+          ? parentList.children.indexOf(node)
+          : -1;
+        const autoNumber = itemIndex >= 0
+          ? (parentList!.start ?? 1) + itemIndex
+          : parseInt(text.slice(markerStart, numEnd), 10);
+        const writtenNumber = parseInt(text.slice(markerStart, numEnd), 10);
+        const replacement = `${autoNumber}${delimiter} `;
+        const autoNumberEnabled = config.orderedLists.autoNumber();
+        const sourceMismatch =
+          autoNumberEnabled &&
+          config.orderedLists.warnWhenSourceNumberDiffers() &&
+          writtenNumber !== autoNumber;
+
+        // Show markers as typed (no computed replacement)
+        if (!autoNumberEnabled) {
+          if (
+            this.tryAddCheckboxDecorations(
+              text,
+              markerStart,
+              markerEnd,
+              end,
+              decorations,
+              true,
+              undefined,
+            )
+          ) {
+            return;
+          }
+          return;
+        }
+
+        // For ordered lists: only add checkbox decoration if present, otherwise auto-number
         // Ordered lists should NOT be decorated with listItem (bullet point)
         if (
           this.tryAddCheckboxDecorations(
@@ -1956,16 +1994,20 @@ export class MarkdownParser {
             end,
             decorations,
             true,
+            replacement,
+            sourceMismatch,
           )
         ) {
           return;
         }
 
-        // Apply color decoration to ordered list markers to ensure they match regular text color
+        // Hide original marker and show auto-calculated number
         decorations.push({
           startPos: markerStart,
           endPos: markerEnd,
           type: "orderedListItem",
+          replacement,
+          orderedListMarkerMismatch: sourceMismatch,
         });
         return;
       }
@@ -1981,6 +2023,8 @@ export class MarkdownParser {
    * @param end - End position of the list item
    * @param decorations - Array to add decorations to
    * @param isOrderedList - Whether this is an ordered list (true) or unordered list (false)
+   * @param orderedReplacement - Auto-numbered replacement text for ordered list markers (omit when auto-number is off)
+   * @param orderedListMarkerMismatch - When true, render ordered marker with a warning tint (source number ≠ computed)
    * @returns true if checkbox was found and decorations were added, false otherwise
    */
   private tryAddCheckboxDecorations(
@@ -1990,6 +2034,8 @@ export class MarkdownParser {
     end: number,
     decorations: DecorationRange[],
     isOrderedList: boolean,
+    orderedReplacement?: string,
+    orderedListMarkerMismatch?: boolean,
   ): boolean {
     // Check for checkbox pattern: [ ] or [x] or [X]
     // GFM requires a space after the closing bracket for task lists
@@ -2016,12 +2062,14 @@ export class MarkdownParser {
     const checkboxEnd = checkboxStart + 3; // [ ], [x], or [X] (space after is not part of checkbox)
     const isChecked = checkChar === "x" || checkChar === "X";
 
-    // For ordered lists with checkboxes, apply color decoration to the numbers
-    if (isOrderedList) {
+    // For ordered lists with checkboxes, hide marker and show auto-numbered replacement
+    if (isOrderedList && orderedReplacement !== undefined) {
       decorations.push({
         startPos: markerStart,
         endPos: markerEnd,
         type: "orderedListItem",
+        replacement: orderedReplacement,
+        orderedListMarkerMismatch: orderedListMarkerMismatch,
       });
     }
     // For unordered lists: no listItem (bullet); single checkbox decoration covers marker + checkbox

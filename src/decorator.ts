@@ -748,7 +748,7 @@ export class Decorator {
 
     // Types that use per-range renderOptions (DecorationOptions, not plain Range)
     const renderOptionsTypes = new Set<DecorationType>([
-      'emoji', 'tablePipe', 'tableSeparatorPipe', 'tableSeparatorDash', 'tableCell',
+      'emoji', 'orderedListItem', 'tablePipe', 'tableSeparatorPipe', 'tableSeparatorDash', 'tableCell',
     ]);
 
     // Apply all decorations by iterating through the type map

@@ -203,6 +203,118 @@ describe('selection overlay for codeBlock/frontmatter', () => {
   });
 });
 
+describe('ordered list auto-numbering decoration', () => {
+  it('renders replacement text when cursor is not on the list line', () => {
+    const text = '1. First\n1. Second\n1. Third\nother line';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 3, type: 'orderedListItem', replacement: '1. ' } as any,
+      { startPos: 9, endPos: 12, type: 'orderedListItem', replacement: '2. ' } as any,
+      { startPos: 19, endPos: 22, type: 'orderedListItem', replacement: '3. ' } as any,
+    ];
+    const editor = makeEditor(text, 3, 0); // cursor on "other line"
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const items = result.get('orderedListItem') as any[];
+    expect(items).toBeDefined();
+    expect(items).toHaveLength(3);
+    expect(items[0].renderOptions?.before?.contentText).toBe('1. ');
+    expect(items[1].renderOptions?.before?.contentText).toBe('2. ');
+    expect(items[2].renderOptions?.before?.contentText).toBe('3. ');
+  });
+
+  it('skips orderedListItem when cursor overlaps marker range (raw reveal)', () => {
+    const text = '1. First\n1. Second';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 3, type: 'orderedListItem', replacement: '1. ' } as any,
+      { startPos: 9, endPos: 12, type: 'orderedListItem', replacement: '2. ' } as any,
+    ];
+    const editor = makeEditor(text, 0, 1); // cursor inside "1. " marker on line 0
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const items = result.get('orderedListItem') as any[];
+    // Line 0 marker should be skipped (raw reveal), line 1 should render
+    expect(items).toBeDefined();
+    expect(items).toHaveLength(1);
+    expect(items[0].renderOptions?.before?.contentText).toBe('2. ');
+  });
+
+  it('renders parenthesis delimiter in replacement', () => {
+    const text = '1) First\n1) Second\nother';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 3, type: 'orderedListItem', replacement: '1) ' } as any,
+      { startPos: 9, endPos: 12, type: 'orderedListItem', replacement: '2) ' } as any,
+    ];
+    const editor = makeEditor(text, 2, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const items = result.get('orderedListItem') as any[];
+    expect(items).toBeDefined();
+    expect(items).toHaveLength(2);
+    expect(items[0].renderOptions?.before?.contentText).toBe('1) ');
+    expect(items[1].renderOptions?.before?.contentText).toBe('2) ');
+  });
+
+  it('renders custom start number in replacement', () => {
+    const text = '5. Start here\n1. Next\nother';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 3, type: 'orderedListItem', replacement: '5. ' } as any,
+      { startPos: 14, endPos: 17, type: 'orderedListItem', replacement: '6. ' } as any,
+    ];
+    const editor = makeEditor(text, 2, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const items = result.get('orderedListItem') as any[];
+    expect(items).toBeDefined();
+    expect(items[0].renderOptions?.before?.contentText).toBe('5. ');
+    expect(items[1].renderOptions?.before?.contentText).toBe('6. ');
+  });
+
+  it('uses warning foreground color when orderedListMarkerMismatch is set', () => {
+    const text = '1. First\n1. Second\nother';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 3, type: 'orderedListItem', replacement: '1. ' } as any,
+      {
+        startPos: 9,
+        endPos: 12,
+        type: 'orderedListItem',
+        replacement: '2. ',
+        orderedListMarkerMismatch: true,
+      } as any,
+    ];
+    const editor = makeEditor(text, 2, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const items = result.get('orderedListItem') as any[];
+    expect(items[0].renderOptions?.before?.color).toBeUndefined();
+    expect(items[1].renderOptions?.before?.color?.id).toBe('editorWarning.foreground');
+  });
+});
+
 describe('filterDecorationsForEditor — basic cases', () => {
   it('returns empty map when no decorations', () => {
     const editor = makeEditor('hello', 0, 0);

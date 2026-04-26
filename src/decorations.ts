@@ -437,13 +437,20 @@ export function ListItemDecorationType(color?: string | ThemeColor) {
 /**
  * Creates a decoration type for ordered list item marker styling.
  *
+ * Hides the original marker (e.g., `1.`, `2)`) and uses per-range renderOptions
+ * to display auto-calculated numbers.
+ *
  * @param {string | ThemeColor | undefined} color - Optional hex or theme color; when undefined uses editor.foreground
  * @returns {vscode.TextEditorDecorationType} A decoration type for ordered list item markers
  */
 export function OrderedListItemDecorationType(color?: string | ThemeColor) {
   const resolvedColor = color ?? new ThemeColor('editor.foreground');
   return window.createTextEditorDecorationType({
-    color: resolvedColor,
+    textDecoration: 'none; display: none;',
+    before: {
+      contentText: '',
+      color: resolvedColor,
+    },
   });
 }
 

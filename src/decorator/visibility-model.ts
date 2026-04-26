@@ -1,4 +1,4 @@
-import { Range, type DecorationOptions, type Position, type TextEditor } from 'vscode';
+import { Range, ThemeColor, type DecorationOptions, type Position, type TextEditor } from 'vscode';
 import type { DecorationRange, DecorationType } from '../parser';
 import { isMarkerDecorationType } from './decoration-categories';
 
@@ -44,6 +44,7 @@ export function filterDecorationsForEditor(
   const selectionOnlyMarkerTypes = new Set<DecorationType>([
     'blockquote',
     'listItem',
+    'orderedListItem',
     'checkboxUnchecked',
     'checkboxChecked',
   ]);
@@ -125,7 +126,22 @@ export function filterDecorationsForEditor(
       }
       // Rendered state: apply marker decorations even on active lines
       const ranges = filtered.get(decoration.type) || [];
-      ranges.push(range);
+      if (decoration.replacement) {
+        const beforeOpts: Record<string, unknown> = {
+          contentText: decoration.replacement,
+        };
+        if (decoration.orderedListMarkerMismatch) {
+          beforeOpts.color = new ThemeColor('editorWarning.foreground');
+        }
+        ranges.push({
+          range,
+          renderOptions: {
+            before: beforeOpts,
+          },
+        });
+      } else {
+        ranges.push(range);
+      }
       filtered.set(decoration.type, ranges);
       continue;
     }

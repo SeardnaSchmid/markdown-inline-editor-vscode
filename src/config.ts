@@ -65,6 +65,20 @@ export const config = {
         .get<boolean>('math.enabled', true);
     },
   },
+  orderedLists: {
+    /** When true, ordered list markers are hidden and replaced with computed numbers (lazy `1.` numbering, etc.). When false, the source text is shown as written. */
+    autoNumber(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('orderedLists.autoNumber', true);
+    },
+    /** When auto-numbering is on, tint the displayed marker when it differs from the number in the source. */
+    warnWhenSourceNumberDiffers(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('orderedLists.warnWhenSourceNumberDiffers', true);
+    },
+  },
   mentions: {
     /** If set, overrides GitHub context: true = force links on, false = force off. Unset = use git remote auto-detect. */
     linksEnabled(): boolean | undefined {

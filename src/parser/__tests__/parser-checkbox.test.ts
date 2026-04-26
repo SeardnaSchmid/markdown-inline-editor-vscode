@@ -119,22 +119,24 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       expect(result.some(d => d.type === 'checkboxChecked')).toBe(false);
     });
 
-    it('should not create any decoration for ordered list without checkbox', () => {
+    it('should create orderedListItem decoration for ordered list without checkbox', () => {
       const markdown = '1. Regular ordered item';
       const result = parser.extractDecorations(markdown);
 
-      // Ordered lists should NOT have listItem decoration (they keep their numbers visible)
+      // Ordered lists get orderedListItem decoration with auto-numbered replacement
       expect(result.some(d => d.type === 'listItem')).toBe(false);
+      expect(result.some(d => d.type === 'orderedListItem')).toBe(true);
       expect(result.some(d => d.type === 'checkboxUnchecked')).toBe(false);
       expect(result.some(d => d.type === 'checkboxChecked')).toBe(false);
     });
 
-    it('should not create any decoration for ordered list with parentheses marker', () => {
+    it('should create orderedListItem decoration for ordered list with parentheses marker', () => {
       const markdown = '1) Regular ordered item';
       const result = parser.extractDecorations(markdown);
 
-      // Ordered lists should NOT have listItem decoration (they keep their numbers visible)
+      // Ordered lists get orderedListItem decoration with auto-numbered replacement
       expect(result.some(d => d.type === 'listItem')).toBe(false);
+      expect(result.some(d => d.type === 'orderedListItem')).toBe(true);
       expect(result.some(d => d.type === 'checkboxUnchecked')).toBe(false);
       expect(result.some(d => d.type === 'checkboxChecked')).toBe(false);
     });

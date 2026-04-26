@@ -129,6 +129,18 @@
           "description": "Render LaTeX math inline ($...$ and $$...$$)",
           "markdownDescription": "Render LaTeX math inline ($...$ and $$...$$). When disabled, math delimiters are shown as plain text."
         },
+        "markdownInlineEditor.orderedLists.autoNumber": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show computed ordered list numbers instead of the source marker",
+          "markdownDescription": "When enabled, ordered list markers are hidden and replaced with sequential numbers (for example lazy `1.` lists). When disabled, numbers in the file are shown exactly as written. The document on disk is never changed either way."
+        },
+        "markdownInlineEditor.orderedLists.warnWhenSourceNumberDiffers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight when the source marker number differs from the computed number",
+          "markdownDescription": "When ordered list auto-numbering is on, use the warning color for the displayed marker when the number in the source text does not match the computed number (for example all lines use `1.` but the view shows 1., 2., 3.)."
+        },
         "markdownInlineEditor.mentions.enabled": {
           "type": "boolean",
           "default": true,
