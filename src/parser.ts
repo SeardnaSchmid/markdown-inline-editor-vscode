@@ -41,8 +41,9 @@ export interface DecorationRange {
     fontWeight?: string;
     fontStyle?: string;
     textDecoration?: string;
+    color?: string;
   };
-  slug?: string; // For type 'mention': segment after @ (e.g. username, org/team). Used by link provider to resolve URL. 
+  slug?: string; // For type 'mention': segment after @ (e.g. username, org/team). Used by link provider to resolve URL.
   issueNumber?: number; // For type 'issueReference': issue/PR number. Used by link provider to resolve URL.
   ownerRepo?: string; // For type 'issueReference' when repo-scoped (@user/repo#456): the "user/repo" part.
 }
@@ -2723,6 +2724,15 @@ export class MarkdownParser {
     this.addScope(scopes, tableStart, tableEnd, "table");
 
     for (let rowIdx = 0; rowIdx < node.children.length; rowIdx++) {
+            const isHeader = rowIdx === 0;
+
+          const rowStyle: { color?: string; fontWeight?: string; } = {};
+            if (isHeader) {
+              rowStyle.color = "var(--vscode-textLink-foreground)";
+              rowStyle.fontWeight = "bold";
+            }
+            const hasRowStyle = Object.keys(rowStyle).length > 0;
+
       const row = node.children[rowIdx];
       if (
         !row.position ||
@@ -2748,6 +2758,7 @@ export class MarkdownParser {
             endPos: pipes[pIdx] + 1,
             type: "tablePipe",
             replacement: "\u2502", // │
+            cellStyle: hasRowStyle ? rowStyle : undefined,
           });
         }
       }
@@ -2786,13 +2797,17 @@ export class MarkdownParser {
           // left or null (default)
           replacement = "\u00A0" + displayContent + "\u00A0".repeat(totalPad + 1);
         }
+        let combinedStyle = cellStyle || undefined;
+        if (hasRowStyle) {
+          combinedStyle = { ...rowStyle, ...(cellStyle || {}) };
+        }
 
         decorations.push({
           startPos: cellRangeStart,
           endPos: cellRangeEnd,
           type: "tableCell",
           replacement,
-          cellStyle,
+          cellStyle: combinedStyle,
         });
       }
 
