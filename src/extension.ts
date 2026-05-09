@@ -14,7 +14,7 @@ import { processSvg } from './mermaid/svg-processor';
 
 /**
  * Checks if a recommended extension is installed and optionally shows a notification.
- * 
+ *
  * @param extensionId - The extension ID (e.g., 'yzhang.markdown-all-in-one')
  * @param context - The extension context for storing state
  * @param showNotification - Whether to show a notification if not installed (default: false)
@@ -27,11 +27,11 @@ function checkRecommendedExtension(
 ): boolean {
   const extension = vscode.extensions.getExtension(extensionId);
   const isInstalled = extension !== undefined;
-  
+
   if (!isInstalled && showNotification) {
     const notificationKey = `recommendationShown.${extensionId}`;
     const hasShownBefore = context.globalState.get<boolean>(notificationKey, false);
-    
+
     if (!hasShownBefore) {
       const extensionName = extensionId.split('.').pop() || extensionId;
       vscode.window.showInformationMessage(
@@ -47,14 +47,14 @@ function checkRecommendedExtension(
       });
     }
   }
-  
+
   return isInstalled;
 }
 
 /**
  * Checks for recommended extensions and shows notifications if needed.
  * Only shows each recommendation once per user.
- * 
+ *
  * @param context - The extension context
  */
 function checkRecommendedExtensions(context: vscode.ExtensionContext): void {
@@ -63,7 +63,7 @@ function checkRecommendedExtensions(context: vscode.ExtensionContext): void {
     'yzhang.markdown-all-in-one',
     'MermaidChart.vscode-mermaid-chart'
   ];
-  
+
   // Check each extension (notifications are shown only once per extension)
   recommendedExtensions.forEach((extensionId) => {
     checkRecommendedExtension(extensionId, context, true);
@@ -114,7 +114,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   const decorator = new Decorator(parseCache, context.workspaceState);
   const diffViewApplyDecorations = config.diffView.applyDecorations();
   decorator.updateDiffViewDecorationSetting(!diffViewApplyDecorations);
-  
+
   decorator.setActiveEditor(vscode.window.activeTextEditor);
 
   // Check for recommended extensions (shows notifications if not installed)
@@ -174,18 +174,18 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
       const uri = vscode.Uri.parse(documentUri);
       const document = await vscode.workspace.openTextDocument(uri);
       const editor = await vscode.window.showTextDocument(document);
-      
+
       // Find the heading with this anchor
       const text = document.getText();
       const lines = text.split('\n');
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         // Check if this line is a heading that matches the anchor
         const headingMatch = line.match(/^#+\s+(.+)$/);
         if (headingMatch) {
           const headingText = normalizeAnchorText(headingMatch[1]);
-          
+
           if (headingText === anchor) {
             // Navigate to this line
             const position = new vscode.Position(i, 0);
@@ -195,7 +195,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
           }
         }
       }
-      
+
       // If not found, show a message
       vscode.window.showInformationMessage(`Anchor "${anchor}" not found`);
     }
@@ -204,7 +204,7 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   const changeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor((editor) => {
     decorator.setActiveEditor(editor);
   });
-  
+
   const changeTextEditorSelection = vscode.window.onDidChangeTextEditorSelection((event) => {
     decorator.updateDecorationsForSelection(event.kind);
   });
@@ -222,20 +222,25 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   });
 
   const changeConfiguration = vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration("markdownInlineEditor.tables.styleHeaders")) {
+      decorator.clearCache();
+      decorator.updateDecorationsForSelection();
+    }
+
     if (event.affectsConfiguration('markdownInlineEditor.defaultBehaviors.diffView.applyDecorations')) {
       const diffViewApplyDecorations = config.diffView.applyDecorations();
       decorator.updateDiffViewDecorationSetting(!diffViewApplyDecorations);
       decorator.updateDecorationsForSelection();
     }
-    
+
     if (event.affectsConfiguration('markdownInlineEditor.decorations.ghostFaintOpacity')) {
       decorator.recreateGhostFaintDecorationType();
     }
-    
+
     if (event.affectsConfiguration('markdownInlineEditor.decorations.frontmatterDelimiterOpacity')) {
       decorator.recreateFrontmatterDelimiterDecorationType();
     }
-    
+
     if (event.affectsConfiguration('markdownInlineEditor.decorations.codeBlockLanguageOpacity')) {
       decorator.recreateCodeBlockLanguageDecorationType();
     }
@@ -279,12 +284,12 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
 
 /**
  * Deactivates the markdown inline preview extension.
- * 
+ *
  * This function is called by VS Code when the extension is deactivated.
  * It properly disposes of all event subscriptions and cleans up resources.
- * 
+ *
  * @param {vscode.ExtensionContext} context - The extension context provided by VS Code
- * 
+ *
  * @example
  * // Called automatically by VS Code when extension is deactivated
  * deactivate(context);

@@ -129,6 +129,12 @@
           "description": "Render LaTeX math inline ($...$ and $$...$$)",
           "markdownDescription": "Render LaTeX math inline ($...$ and $$...$$). When disabled, math delimiters are shown as plain text."
         },
+        "markdownInlineEditor.tables.highlightHeaders": {
+          "type": "boolean",
+          "default": true ,
+          "description": "Highlights table headers",
+          "markdownDescription": "Apply bold and accent color styling to Markdown table headers."
+        },
         "markdownInlineEditor.mentions.enabled": {
           "type": "boolean",
           "default": true,

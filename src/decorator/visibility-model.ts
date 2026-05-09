@@ -195,9 +195,9 @@ export function filterDecorationsForEditor(
         };
         if (decoration.cellStyle) {
           if (decoration.cellStyle.fontWeight) beforeOpts.fontWeight = decoration.cellStyle.fontWeight;
-          if (decoration.cellStyle.fontStyle) beforeOpts.fontStyle = decoration.cellStyle.fontStyle;
-          if (decoration.cellStyle.textDecoration) beforeOpts.textDecoration = decoration.cellStyle.textDecoration;
+          if (decoration.cellStyle.color) beforeOpts.color = decoration.cellStyle.color;
         }
+
         ranges.push({
           range,
           renderOptions: {
