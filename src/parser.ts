@@ -2724,15 +2724,15 @@ export class MarkdownParser {
     this.addScope(scopes, tableStart, tableEnd, "table");
 
     for (let rowIdx = 0; rowIdx < node.children.length; rowIdx++) {
-            const isHeader = rowIdx === 0;
+      const isHeader = rowIdx === 0;
 
-          const rowStyle: { color?: string; fontWeight?: string; } = {};
-            if (isHeader) {
-              rowStyle.color = "var(--vscode-textLink-foreground)";
-              rowStyle.fontWeight = "bold";
-            }
-            const hasRowStyle = Object.keys(rowStyle).length > 0;
+      const rowStyle: { color?: string; fontWeight?: string } = {};
 
+      // apply the style if it is a header and the user has the setting enabled
+      if (isHeader && config.tables.highlightHeaders()) {
+        rowStyle.color = "var(--vscode-textLink-foreground)";
+      }
+      const hasRowStyle = Object.keys(rowStyle).length > 0;
       const row = node.children[rowIdx];
       if (
         !row.position ||
@@ -2747,7 +2747,10 @@ export class MarkdownParser {
       const trimmedLineEnd = this.trimLineEnd(text, lineStart, lineEnd);
       const rawPipes = this.findPipePositions(text, lineStart, trimmedLineEnd);
       const { positions: pipes, isVirtual } = this.normalizePipePositions(
-        text, lineStart, trimmedLineEnd, rawPipes,
+        text,
+        lineStart,
+        trimmedLineEnd,
+        rawPipes,
       );
 
       // Only decorate real (non-virtual) pipes
@@ -2777,25 +2780,33 @@ export class MarkdownParser {
         // Whole-cell styled: extract clean text via AST + apply CSS
         // Mixed formatting: show raw syntax (VS Code can't partially style)
         // Plain / escaped: use AST extraction (handles \| → |, \\ → \)
-        const astCell = i < row.children.length ? row.children[i] as TableCell : undefined;
-        const showRaw = !cellStyle && astCell && this.cellHasMixedFormatting(astCell);
-        const displayContent = (astCell && !showRaw)
-          ? this.extractCellPlainText(astCell)
-          : trimmedContent;
+        const astCell =
+          i < row.children.length ? (row.children[i] as TableCell) : undefined;
+        const showRaw =
+          !cellStyle && astCell && this.cellHasMixedFormatting(astCell);
+        const displayContent =
+          astCell && !showRaw
+            ? this.extractCellPlainText(astCell)
+            : trimmedContent;
         const displayWidth = this.measureTextWidth(displayContent);
         const totalPad = Math.max(0, colWidth - displayWidth);
         const align = i < colAligns.length ? colAligns[i] : null;
 
         let replacement: string;
         if (align === "right") {
-          replacement = "\u00A0".repeat(totalPad + 1) + displayContent + "\u00A0";
+          replacement =
+            "\u00A0".repeat(totalPad + 1) + displayContent + "\u00A0";
         } else if (align === "center") {
           const padLeft = Math.floor(totalPad / 2);
           const padRight = totalPad - padLeft;
-          replacement = "\u00A0".repeat(padLeft + 1) + displayContent + "\u00A0".repeat(padRight + 1);
+          replacement =
+            "\u00A0".repeat(padLeft + 1) +
+            displayContent +
+            "\u00A0".repeat(padRight + 1);
         } else {
           // left or null (default)
-          replacement = "\u00A0" + displayContent + "\u00A0".repeat(totalPad + 1);
+          replacement =
+            "\u00A0" + displayContent + "\u00A0".repeat(totalPad + 1);
         }
         let combinedStyle = cellStyle || undefined;
         if (hasRowStyle) {
@@ -2833,10 +2844,18 @@ export class MarkdownParser {
         }
 
         const trimmedSepEnd = this.trimLineEnd(text, sepLineStart, sepLineEnd);
-        const rawSepPipes = this.findPipePositions(text, sepLineStart, trimmedSepEnd);
-        const { positions: sepPipes, isVirtual: sepIsVirtual } = this.normalizePipePositions(
-          text, sepLineStart, trimmedSepEnd, rawSepPipes,
+        const rawSepPipes = this.findPipePositions(
+          text,
+          sepLineStart,
+          trimmedSepEnd,
         );
+        const { positions: sepPipes, isVirtual: sepIsVirtual } =
+          this.normalizePipePositions(
+            text,
+            sepLineStart,
+            trimmedSepEnd,
+            rawSepPipes,
+          );
 
         // Use │ for separator pipes (same as data rows) and ASCII - for
         // dashes. Box-drawing ─ (U+2500) renders wider than monospace chars

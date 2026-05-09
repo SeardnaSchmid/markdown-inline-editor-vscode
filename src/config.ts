@@ -79,6 +79,14 @@ export const config = {
         .get<boolean>('mentions.enabled', true);
     },
   },
+  tables: {
+    highlightHeaders(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('tables.highlightHeaders', true);
+    },
+  },
+
   colors: {
     heading1(): string | undefined {
       return getColorConfig('heading1');
