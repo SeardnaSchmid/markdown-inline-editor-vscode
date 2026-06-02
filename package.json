@@ -300,7 +300,7 @@
   },
   "dependencies": {
     "cheerio": "1.2.0",
-    "katex": "^0.16.45",
+    "katex": "^0.17.0",
     "mathjax-full": "^3.2.2",
     "mermaid": "11.15.0",
     "remark-gfm": "4.0.1",
