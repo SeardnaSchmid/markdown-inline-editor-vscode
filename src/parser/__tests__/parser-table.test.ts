@@ -1,4 +1,5 @@
 import { MarkdownParser, DecorationRange } from '../../parser';
+import { config } from '../../config';
 
 describe('MarkdownParser - Tables', () => {
   let parser: MarkdownParser;
@@ -102,6 +103,29 @@ describe('MarkdownParser - Tables', () => {
       // All cells should have replacement text
       cells.forEach((c) => {
         expect(c.replacement).toBeDefined();
+      });
+    });
+
+    describe('when tables.cjkWidthRatio is configured', () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it('should use the configured ratio for visual column width calculation', () => {
+        const md = '| A |\n|---|\n| \u3042\u3042 |';
+        const cjkWidthRatio = vi.spyOn(config.tables, 'cjkWidthRatio');
+
+        cjkWidthRatio.mockReturnValue(2);
+        const twoColumnCells = byType(parser.extractDecorations(md), 'tableCell');
+        const twoColumnHeader = twoColumnCells.find((c) => c.replacement?.includes('A'));
+        expect(twoColumnHeader).toBeDefined();
+        expect(twoColumnHeader!.replacement!.length).toBe(6);
+
+        cjkWidthRatio.mockReturnValue(3);
+        const threeColumnCells = byType(parser.extractDecorations(md), 'tableCell');
+        const threeColumnHeader = threeColumnCells.find((c) => c.replacement?.includes('A'));
+        expect(threeColumnHeader).toBeDefined();
+        expect(threeColumnHeader!.replacement!.length).toBe(8);
       });
     });
   });

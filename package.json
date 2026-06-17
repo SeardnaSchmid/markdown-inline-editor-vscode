@@ -136,6 +136,14 @@
           "description": "Render LaTeX math inline ($...$ and $$...$$)",
           "markdownDescription": "Render LaTeX math inline ($...$ and $$...$$). When disabled, math delimiters are shown as plain text."
         },
+        "markdownInlineEditor.tables.cjkWidthRatio": {
+          "type": "number",
+          "default": 2.25,
+          "minimum": 1,
+          "maximum": 3,
+          "description": "CJK character width ratio for visual table alignment",
+          "markdownDescription": "Display-width ratio used for CJK characters when padding visual GFM table columns. The default `2.25` preserves the previous `2 + 0.25` correction. Set to `2.0` when your editor font renders CJK close to two ASCII columns."
+        },
         "markdownInlineEditor.orderedLists.autoNumber": {
           "type": "boolean",
           "default": true,

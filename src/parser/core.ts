@@ -1294,17 +1294,14 @@ export class MarkdownParser {
    * (no markdown markers — callers use `extractCellPlainText` / `detectCellStyle` paths).
    *
    * CJK wide characters (Unicode ranges U+2E80–U+9FFF, U+F900–U+FAFF,
-   * U+FE30–U+FE4F, U+20000–U+2FA1F) count as 2 columns; all others as 1.
-   *
-   * Adds a small per-CJK-character correction because VS Code's `before`
-   * pseudo-element renders CJK glyphs slightly wider than exactly 2x
-   * ASCII width in most monospace fonts.
+   * U+FE30–U+FE4F, U+20000–U+2FA1F) use the configured table CJK width
+   * ratio; all other characters count as 1 column.
    *
    * @param plain - Already-unmarked cell display text
    * @returns Estimated width in monospace columns
    */
-  private measureTextWidth(plain: string): number {
-    return measureTextWidthHelper(plain);
+  private measureTextWidth(plain: string, cjkWidthRatio: number): number {
+    return measureTextWidthHelper(plain, cjkWidthRatio);
   }
 
   /**
@@ -1363,8 +1360,12 @@ export class MarkdownParser {
    * @param source - The full normalized document text
    * @returns Array of column widths (one per column, minimum 3)
    */
-  private computeColumnWidths(tableNode: Table, source: string): number[] {
-    return computeColumnWidthsHelper(tableNode, source);
+  private computeColumnWidths(
+    tableNode: Table,
+    source: string,
+    cjkWidthRatio: number,
+  ): number[] {
+    return computeColumnWidthsHelper(tableNode, source, cjkWidthRatio);
   }
 
   /**
@@ -1395,7 +1396,8 @@ export class MarkdownParser {
 
     const tableStart = node.position!.start.offset!;
     const tableEnd = node.position!.end.offset!;
-    const colWidths = this.computeColumnWidths(node, text);
+    const cjkWidthRatio = config.tables.cjkWidthRatio();
+    const colWidths = this.computeColumnWidths(node, text, cjkWidthRatio);
     const colAligns = node.align ?? [];
 
     this.addScope(scopes, tableStart, tableEnd, "table");
@@ -1449,7 +1451,7 @@ export class MarkdownParser {
         const displayContent = (astCell && !showRaw)
           ? this.extractCellPlainText(astCell)
           : trimmedContent;
-        const displayWidth = this.measureTextWidth(displayContent);
+        const displayWidth = this.measureTextWidth(displayContent, cjkWidthRatio);
         const totalPad = Math.max(0, colWidth - displayWidth);
         const align = i < colAligns.length ? colAligns[i] : null;
 

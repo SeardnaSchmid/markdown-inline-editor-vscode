@@ -4,6 +4,7 @@ const SECTION = 'markdownInlineEditor' as const;
 
 /** Matches `#` + 3, 4, 6, or 8 hex digits (#RGB, #RGBA, #RRGGBB, #RRGGBBAA). Invalid values are treated as unset. */
 const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+const DEFAULT_TABLE_CJK_WIDTH_RATIO = 2.25;
 
 function parseHexColor(value: string | undefined | null): string | undefined {
   if (value === undefined || value === null || typeof value !== 'string') {
@@ -17,6 +18,17 @@ function getColorConfig(key: string): string | undefined {
   return parseHexColor(
     vscode.workspace.getConfiguration(SECTION).get<string>(`colors.${key}`)
   );
+}
+
+function getNumberConfig(key: string, defaultValue: number, min: number, max: number): number {
+  const value = vscode.workspace
+    .getConfiguration(SECTION)
+    .get<unknown>(key, defaultValue);
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return defaultValue;
+  }
+  return Math.min(max, Math.max(min, numeric));
 }
 
 export const config = {
@@ -69,6 +81,12 @@ export const config = {
       return vscode.workspace
         .getConfiguration(SECTION)
         .get<boolean>('math.enabled', true);
+    },
+  },
+  tables: {
+    /** Display-width ratio for CJK glyphs when padding visual GFM table columns. */
+    cjkWidthRatio(): number {
+      return getNumberConfig('tables.cjkWidthRatio', DEFAULT_TABLE_CJK_WIDTH_RATIO, 1, 3);
     },
   },
   orderedLists: {
