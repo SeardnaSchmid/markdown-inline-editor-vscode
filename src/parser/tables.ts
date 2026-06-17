@@ -71,9 +71,11 @@ export function detectCellStyle(
   return undefined;
 }
 
-export function measureTextWidth(plain: string): number {
+export function measureTextWidth(
+  plain: string,
+  cjkWidthRatio: number,
+): number {
   let width = 0;
-  let cjkCount = 0;
   for (const char of plain) {
     const code = char.codePointAt(0)!;
     if (
@@ -82,13 +84,12 @@ export function measureTextWidth(plain: string): number {
       (code >= 0xfe30 && code <= 0xfe4f) ||
       (code >= 0x20000 && code <= 0x2fa1f)
     ) {
-      width += 2;
-      cjkCount++;
+      width += cjkWidthRatio;
     } else {
       width += 1;
     }
   }
-  return width + Math.ceil(cjkCount * 0.25);
+  return Math.ceil(width);
 }
 
 export function findPipePositions(
@@ -163,7 +164,11 @@ export function trimLineEnd(text: string, lineStart: number, lineEnd: number): n
   return end;
 }
 
-export function computeColumnWidths(tableNode: Table, source: string): number[] {
+export function computeColumnWidths(
+  tableNode: Table,
+  source: string,
+  cjkWidthRatio: number,
+): number[] {
   let numCols = 0;
 
   for (const row of tableNode.children) {
@@ -193,7 +198,7 @@ export function computeColumnWidths(tableNode: Table, source: string): number[] 
       const displayText = (astCell && !showRaw)
         ? extractCellPlainText(astCell)
         : cellText;
-      const width = measureTextWidth(displayText);
+      const width = measureTextWidth(displayText, cjkWidthRatio);
       if (width > widths[i]) widths[i] = width;
     }
   }

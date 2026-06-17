@@ -19,6 +19,7 @@ describe('registerEventHandlers', () => {
       recreateCodeBlockLanguageDecorationType: vi.fn(),
       recreateColorDependentTypes: vi.fn(),
       clearMathDecorationCache: vi.fn(),
+      clearCache: vi.fn(),
     };
     const linkClickHandler = {
       setEnabled: vi.fn(),
@@ -78,6 +79,7 @@ describe('registerEventHandlers', () => {
       recreateCodeBlockLanguageDecorationType: vi.fn(),
       recreateColorDependentTypes: vi.fn(),
       clearMathDecorationCache: vi.fn(),
+      clearCache: vi.fn(),
     };
 
     registerEventHandlers(decorator as any, { setEnabled: vi.fn() } as any);
@@ -126,6 +128,7 @@ describe('registerEventHandlers', () => {
       recreateCodeBlockLanguageDecorationType: vi.fn(),
       recreateColorDependentTypes: vi.fn(),
       clearMathDecorationCache: vi.fn(),
+      clearCache: vi.fn(),
     };
     const linkClickHandler = {
       setEnabled: vi.fn(),
@@ -139,6 +142,7 @@ describe('registerEventHandlers', () => {
       'markdownInlineEditor.decorations.frontmatterDelimiterOpacity',
       'markdownInlineEditor.decorations.codeBlockLanguageOpacity',
       'markdownInlineEditor.links.singleClickOpen',
+      'markdownInlineEditor.tables.cjkWidthRatio',
       'markdownInlineEditor.colors',
       'editor.fontSize',
       'editor.lineHeight',
@@ -155,6 +159,7 @@ describe('registerEventHandlers', () => {
     expect(decorator.recreateFrontmatterDelimiterDecorationType).toHaveBeenCalled();
     expect(decorator.recreateCodeBlockLanguageDecorationType).toHaveBeenCalled();
     expect(linkClickHandler.setEnabled).toHaveBeenCalledWith(true);
+    expect(decorator.clearCache).toHaveBeenCalledTimes(1);
     expect(decorator.recreateColorDependentTypes).toHaveBeenCalledTimes(2);
     expect(decorator.clearMathDecorationCache).toHaveBeenCalledTimes(1);
   });
