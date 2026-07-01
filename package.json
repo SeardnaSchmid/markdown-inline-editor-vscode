@@ -299,7 +299,7 @@
     "cheerio": "1.2.0",
     "katex": "^0.17.0",
     "mathjax-full": "^3.2.2",
-    "mermaid": "11.15.0",
+    "mermaid": "11.16.0",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "unified": "11.0.5",
