@@ -6,6 +6,7 @@ export type MermaidRenderOptions = {
   fontFamily?: string;
   height?: number; // Height in pixels based on line count
   numLines?: number; // Number of lines in the code block
+  maxWidth?: number; // Maximum width in pixels for scaling oversized diagrams
 };
 
 /**

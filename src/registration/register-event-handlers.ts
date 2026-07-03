@@ -3,6 +3,19 @@ import { config } from '../config';
 import { Decorator } from '../decorator';
 import { LinkClickHandler } from '../link-click-handler';
 
+const MERMAID_VIEWPORT_REFRESH_MS = 150;
+let mermaidViewportRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleMermaidViewportRefresh(decorator: Decorator): void {
+  if (mermaidViewportRefreshTimer) {
+    clearTimeout(mermaidViewportRefreshTimer);
+  }
+  mermaidViewportRefreshTimer = setTimeout(() => {
+    mermaidViewportRefreshTimer = undefined;
+    decorator.clearMermaidDecorationCache();
+  }, MERMAID_VIEWPORT_REFRESH_MS);
+}
+
 export function registerEventHandlers(
   decorator: Decorator,
   linkClickHandler: LinkClickHandler
@@ -35,6 +48,10 @@ export function registerEventHandlers(
         decorator.recreateGhostFaintDecorationType();
       }
 
+      if (event.affectsConfiguration('markdownInlineEditor.decorations.ghostLinks.collapse')) {
+        decorator.updateDecorationsForSelection();
+      }
+
       if (event.affectsConfiguration('markdownInlineEditor.decorations.frontmatterDelimiterOpacity')) {
         decorator.recreateFrontmatterDelimiterDecorationType();
       }
@@ -58,6 +75,21 @@ export function registerEventHandlers(
       if (event.affectsConfiguration('editor.fontSize') || event.affectsConfiguration('editor.lineHeight')) {
         decorator.clearMathDecorationCache();
       }
+
+      if (
+        event.affectsConfiguration('markdownInlineEditor.mermaid.maxWidthColumns') ||
+        event.affectsConfiguration('editor.fontSize')
+      ) {
+        decorator.clearMermaidDecorationCache();
+      }
+    }),
+    vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
+      if (event.textEditor === vscode.window.activeTextEditor) {
+        scheduleMermaidViewportRefresh(decorator);
+      }
+    }),
+    vscode.window.onDidChangeWindowState(() => {
+      scheduleMermaidViewportRefresh(decorator);
     }),
     vscode.window.onDidChangeActiveColorTheme(() => {
       decorator.recreateColorDependentTypes();

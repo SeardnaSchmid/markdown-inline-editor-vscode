@@ -142,3 +142,27 @@ describe('scanMathRegions - fence-aware behavior', () => {
     expect(scanMathRegions(text)).toHaveLength(0);
   });
 });
+
+describe('scanMathRegions - inline code span behavior', () => {
+  it('skips $...$ inside inline backtick code (#92)', () => {
+    expect(scanMathRegions('`${FOO}`')).toEqual([]);
+    expect(scanMathRegions('`$100$`')).toEqual([]);
+    expect(scanMathRegions('`const s = "$x$"`')).toEqual([]);
+  });
+
+  it('still detects math outside inline code on the same line', () => {
+    const text = 'Before $a$ and `const b = "$y$"` and After $c$';
+    const regions = scanMathRegions(text);
+    expect(regions).toHaveLength(2);
+    expect(regions.map((r) => r.source)).toEqual(['a', 'c']);
+  });
+
+  it('handles longer backtick runs for inline code', () => {
+    expect(scanMathRegions('`` `$z$` ``')).toEqual([]);
+  });
+
+  it('skips dollars in inline code inside list items', () => {
+    const text = '- `${pkgs.system}` and `$a + $b`';
+    expect(scanMathRegions(text)).toEqual([]);
+  });
+});

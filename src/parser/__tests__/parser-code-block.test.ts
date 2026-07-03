@@ -736,5 +736,41 @@ describe('MarkdownParser - Code Blocks', () => {
       expect(languageDec).toBeDefined();
     });
   });
+
+  describe('indented code blocks inside ordered lists (#80)', () => {
+    it('should style multiple indented fences without bleeding into list text', () => {
+      const markdown = [
+        '1. Test scene:',
+        '',
+        '    ```sh',
+        '    npm start -- --scene=$SCENE_NAME --web',
+        '    ```',
+        '',
+        '    i.e.',
+        '',
+        '    ```sh',
+        '    npm start -- --scene=pdf --web',
+        '    ```',
+        '',
+        '2. Trigger a render locally (using case directory):',
+        '',
+        '    ```sh',
+        '    npm start -- --scene=$SCENE_NAME --case=$PATH_TO_CASE --output=$PATH_TO_OUTPUT_PNG',
+        '    ```',
+      ].join('\n');
+
+      const result = parser.extractDecorations(markdown);
+      const codeBlocks = result.filter((d) => d.type === 'codeBlock');
+      expect(codeBlocks.length).toBe(3);
+
+      const listMarkerDecs = result.filter((d) => d.type === 'listMarker' || d.type === 'listItem');
+      listMarkerDecs.forEach((dec) => {
+        codeBlocks.forEach((block) => {
+          const overlaps = dec.startPos < block.endPos && dec.endPos > block.startPos;
+          expect(overlaps).toBe(false);
+        });
+      });
+    });
+  });
 });
 

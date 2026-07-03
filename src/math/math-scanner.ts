@@ -15,6 +15,11 @@ type FencedCodeBlock = {
   isMathFence: boolean;
 };
 
+type InlineCodeSpan = {
+  startPos: number;
+  endPos: number;
+};
+
 const MATH_FENCE_LANGUAGES = new Set(['math', 'latex', 'tex']);
 
 /**
@@ -28,10 +33,12 @@ const MATH_FENCE_LANGUAGES = new Set(['math', 'latex', 'tex']);
  */
 export function scanMathRegions(text: string): MathRegion[] {
   const fencedBlocks = scanFencedCodeBlocks(text);
+  const inlineCodeSpans = scanInlineCodeSpans(text);
   const regions: MathRegion[] = [];
   let i = 0;
   const n = text.length;
   let fenceIndex = 0;
+  let inlineCodeIndex = 0;
 
   while (i < n) {
     while (fenceIndex < fencedBlocks.length && fencedBlocks[fenceIndex].endPos <= i) {
@@ -40,6 +47,15 @@ export function scanMathRegions(text: string): MathRegion[] {
     const activeFence = fencedBlocks[fenceIndex];
     if (activeFence && i >= activeFence.startPos && i < activeFence.endPos) {
       i = activeFence.endPos;
+      continue;
+    }
+
+    while (inlineCodeIndex < inlineCodeSpans.length && inlineCodeSpans[inlineCodeIndex].endPos <= i) {
+      inlineCodeIndex++;
+    }
+    const activeInlineCode = inlineCodeSpans[inlineCodeIndex];
+    if (activeInlineCode && i >= activeInlineCode.startPos && i < activeInlineCode.endPos) {
+      i = activeInlineCode.endPos;
       continue;
     }
 
@@ -227,6 +243,63 @@ function scanFencedCodeBlocks(text: string): FencedCodeBlock[] {
   }
 
   return blocks;
+}
+
+/**
+ * Scans for CommonMark inline code spans delimited by backtick runs.
+ * Opening and closing runs must be the same length or the closing run may be longer.
+ */
+function scanInlineCodeSpans(text: string): InlineCodeSpan[] {
+  const spans: InlineCodeSpan[] = [];
+  let i = 0;
+
+  while (i < text.length) {
+    if (text[i] !== '`') {
+      i++;
+      continue;
+    }
+
+    let openLen = 0;
+    let j = i;
+    while (j < text.length && text[j] === '`' && openLen < 32) {
+      openLen++;
+      j++;
+    }
+    if (openLen === 0) {
+      i++;
+      continue;
+    }
+
+    let k = j;
+    let closedAt = -1;
+    while (k < text.length) {
+      if (text[k] !== '`') {
+        k++;
+        continue;
+      }
+      let closeLen = 0;
+      let m = k;
+      while (m < text.length && text[m] === '`' && closeLen < 32) {
+        closeLen++;
+        m++;
+      }
+      if (closeLen >= openLen) {
+        closedAt = m;
+        break;
+      }
+      k = m;
+    }
+
+    if (closedAt === -1) {
+      i = j;
+      continue;
+    }
+
+    spans.push({ startPos: i, endPos: closedAt });
+    i = closedAt;
+  }
+
+  return spans;
 }
 
 function parseOpeningFence(

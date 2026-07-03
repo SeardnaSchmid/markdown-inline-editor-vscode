@@ -46,6 +46,11 @@ export const config = {
         .getConfiguration(SECTION)
         .get<number>('decorations.ghostFaintOpacity', 0.3);
     },
+    ghostLinksCollapse(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('decorations.ghostLinks.collapse', false);
+    },
     frontmatterDelimiterOpacity(): number {
       return vscode.workspace
         .getConfiguration(SECTION)
@@ -69,6 +74,14 @@ export const config = {
       return vscode.workspace
         .getConfiguration(SECTION)
         .get<boolean>('math.enabled', true);
+    },
+  },
+  mermaid: {
+    /** Override max diagram width in columns; 0 uses auto viewport estimate. */
+    maxWidthColumns(): number {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<number>('mermaid.maxWidthColumns', 0);
     },
   },
   orderedLists: {

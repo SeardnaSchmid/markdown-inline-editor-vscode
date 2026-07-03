@@ -3,6 +3,7 @@ import { ColorThemeKind, Position, Range, TextEditor, window, workspace } from '
 import type { MermaidBlock } from '../parser';
 import { mapNormalizedToOriginal } from '../position-mapping';
 import { renderMermaidSvg, svgToDataUri, createErrorSvg } from '../mermaid/mermaid-renderer';
+import { bucketWidthForCache, estimateEditorContentWidthPx } from '../mermaid/editor-width';
 import { MermaidDiagramDecorations } from './mermaid-diagram-decorations';
 import { createRange, isSelectionOrCursorInsideOffsets } from './editor-decoration-applier';
 import { logWarn } from '../logging';
@@ -11,6 +12,7 @@ type MermaidBlockKeyCacheEntry = {
   theme: 'default' | 'dark';
   fontFamily?: string;
   numLines: number;
+  maxWidthBucket: number;
   key: string;
 };
 
@@ -19,21 +21,23 @@ const mermaidBlockKeyCache = new WeakMap<MermaidBlock, MermaidBlockKeyCacheEntry
 function getMermaidBlockCacheKey(
   block: MermaidBlock,
   theme: 'default' | 'dark',
-  fontFamily?: string
+  fontFamily: string | undefined,
+  maxWidthBucket: number,
 ): string {
   const cached = mermaidBlockKeyCache.get(block);
   if (
     cached &&
     cached.theme === theme &&
     cached.fontFamily === fontFamily &&
-    cached.numLines === block.numLines
+    cached.numLines === block.numLines &&
+    cached.maxWidthBucket === maxWidthBucket
   ) {
     return cached.key;
   }
 
-  const keySource = `${block.source}\n${theme}\n${fontFamily ?? ''}\n${block.numLines}`;
+  const keySource = `${block.source}\n${theme}\n${fontFamily ?? ''}\n${block.numLines}\n${maxWidthBucket}`;
   const key = createHash('sha256').update(keySource).digest('hex');
-  mermaidBlockKeyCache.set(block, { theme, fontFamily, numLines: block.numLines, key });
+  mermaidBlockKeyCache.set(block, { theme, fontFamily, numLines: block.numLines, maxWidthBucket, key });
   return key;
 }
 
@@ -87,6 +91,8 @@ export class MermaidUpdateCoordinator {
       ? 'dark'
       : 'default';
     const fontFamily = workspace.getConfiguration('editor').get<string>('fontFamily');
+    const maxWidth = estimateEditorContentWidthPx(editor);
+    const maxWidthBucket = bucketWidthForCache(maxWidth);
 
     const rangesByKey = new Map<string, Range[]>();
     const dataUrisByKey = new Map<string, string>();
@@ -122,12 +128,17 @@ export class MermaidUpdateCoordinator {
           new Position(contentStartPos.line, indicatorEndChar)
         );
 
-        const key = getMermaidBlockCacheKey(block, theme, fontFamily);
+        const key = getMermaidBlockCacheKey(block, theme, fontFamily, maxWidthBucket);
         let dataUriPromise = dataUriPromisesByKey.get(key);
         if (!dataUriPromise) {
           dataUriPromise = (async () => {
             try {
-              const svg = await renderMermaidSvg(block.source, { theme, fontFamily, numLines: block.numLines });
+              const svg = await renderMermaidSvg(block.source, {
+                theme,
+                fontFamily,
+                numLines: block.numLines,
+                maxWidth,
+              });
               return svgToDataUri(svg);
             } catch (error) {
               logWarn('Mermaid render failed', error);

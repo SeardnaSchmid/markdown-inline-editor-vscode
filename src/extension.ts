@@ -7,6 +7,10 @@ import { MarkdownParseCache } from './markdown-parse-cache';
 import { MarkdownParser } from './parser';
 import { disposeMermaidRenderer, initMermaidRenderer } from './mermaid/mermaid-renderer';
 import { processSvg } from './mermaid/svg-processor';
+import { estimateEditorContentWidthPx, bucketWidthForCache } from './mermaid/editor-width';
+import { scanMathRegions } from './math/math-scanner';
+import { isDiffLikeUri } from './diff-context';
+import { filterDecorationsForEditor } from './decorator/visibility-model';
 import { checkRecommendedExtensions } from './recommendations';
 import { registerEventHandlers } from './registration/register-event-handlers';
 import { registerProviders } from './registration/register-providers';
@@ -26,6 +30,14 @@ export type ExtensionApi = {
   /** SVG processing utilities exposed for integration tests. */
   svgProcessor: {
     processSvg: (svgString: string, height: number, maxWidth?: number) => string;
+  };
+  /** Pure helpers exposed for integration / E2E assertions. */
+  testUtils: {
+    scanMathRegions: typeof scanMathRegions;
+    estimateEditorContentWidthPx: typeof estimateEditorContentWidthPx;
+    bucketWidthForCache: typeof bucketWidthForCache;
+    isDiffLikeUri: typeof isDiffLikeUri;
+    filterDecorationsForEditor: typeof filterDecorationsForEditor;
   };
 };
 
@@ -57,7 +69,18 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
     { dispose: () => disposeLogger() },
   );
 
-  return { parseCache, decorator, svgProcessor: { processSvg } };
+  return {
+    parseCache,
+    decorator,
+    svgProcessor: { processSvg },
+    testUtils: {
+      scanMathRegions,
+      estimateEditorContentWidthPx,
+      bucketWidthForCache,
+      isDiffLikeUri,
+      filterDecorationsForEditor,
+    },
+  };
 }
 
 export function deactivate(): void {

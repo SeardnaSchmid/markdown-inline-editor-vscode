@@ -12,22 +12,53 @@ const EXTENSION_ID = 'CodeSmith.markdown-inline-editor-vscode';
 // We cannot import those types directly (tsconfig.e2e.json rootDir constraint),
 // so we declare the minimal shape needed here.
 type DR = { type: string; startPos: number; endPos: number; url?: string };
-type PE = { text: string; decorations: DR[] };
-type ParseCacheExport = { get(doc: vscode.TextDocument): PE };
 type DecoratorExport = {
   isEnabled(): boolean;
   activeEditor: vscode.TextEditor | undefined;
   onApply: ((nonEmptyTypeCount: number) => void) | undefined;
+  /** True when the active editor document URI is a diff/merge view. */
+  isActiveEditorDiffView(): boolean;
 };
+type MathRegionExport = { startPos: number; endPos: number; source: string; displayMode: boolean };
+type ScopeRangeExport = { startPos: number; endPos: number; kind?: string };
+type MermaidBlockExport = { startPos: number; endPos: number; source: string; numLines: number };
+type PE = {
+  text: string;
+  decorations: DR[];
+  mathRegions: MathRegionExport[];
+  scopes: ScopeRangeExport[];
+  mermaidBlocks: MermaidBlockExport[];
+};
+type ParseCacheExport = { get(doc: vscode.TextDocument): PE };
 type SvgProcessorExport = {
   processSvg: (svgString: string, height: number, maxWidth?: number) => string;
 };
-type ExtExports = { parseCache?: ParseCacheExport; decorator?: DecoratorExport; svgProcessor?: SvgProcessorExport };
+type TestUtilsExport = {
+  scanMathRegions: (text: string) => MathRegionExport[];
+  estimateEditorContentWidthPx: (editor: vscode.TextEditor) => number;
+  bucketWidthForCache: (widthPx: number) => number;
+  isDiffLikeUri: (uri: vscode.Uri) => boolean;
+  filterDecorationsForEditor: (
+    editor: vscode.TextEditor,
+    decorations: DR[],
+    scopes: Array<{ startPos: number; endPos: number; range: vscode.Range; kind?: string }>,
+    originalText: string,
+    rangeFactory: (startPos: number, endPos: number, originalText: string) => vscode.Range | null,
+    options?: { ghostLinksCollapse?: boolean },
+  ) => Map<string, unknown[]>;
+};
+type ExtExports = {
+  parseCache?: ParseCacheExport;
+  decorator?: DecoratorExport;
+  svgProcessor?: SvgProcessorExport;
+  testUtils?: TestUtilsExport;
+};
 
 /** Populated in suiteSetup from ext.exports. */
 let cache: ParseCacheExport | undefined;
 let decoratorApi: DecoratorExport | undefined;
 let svgProcessor: SvgProcessorExport | undefined;
+let testUtils: TestUtilsExport | undefined;
 
 suite('Extension E2E', () => {
   suiteSetup(async () => {
@@ -39,6 +70,7 @@ suite('Extension E2E', () => {
     cache = exports?.parseCache;
     decoratorApi = exports?.decorator;
     svgProcessor = exports?.svgProcessor;
+    testUtils = exports?.testUtils;
   });
 
   test('extension is present', () => {
@@ -1154,10 +1186,323 @@ suite('Extension E2E', () => {
       'Expected heading1 decoration in cache after inserting "# Heading"'
     );
   });
+
+  // ── Regressions for PR #129 (issues #80, #92, #95, #108, #114) ───────────
+
+  test('#92 — parse: $ inside inline backtick code does not produce math regions', async () => {
+    assert.ok(cache, 'parseCache not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: [
+        '- `${pkgs.system}` boilerplate',
+        '- `$100$` literal dollars',
+        '- `const s = "$x$"` inside code',
+      ].join('\n'),
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(400);
+    const entry = cache.get(doc);
+    assert.strictEqual(
+      entry.mathRegions.length,
+      0,
+      `Expected no math regions for $ inside inline code, got: ${entry.mathRegions.map(r => r.source).join(', ')}`
+    );
+  });
+
+  test('#92 — testUtils.scanMathRegions skips $ inside inline code but keeps outside math', () => {
+    assert.ok(testUtils, 'testUtils not available from ext.exports');
+    const text = 'Before $a$ and `const b = "$y$"` and After $c$';
+    const regions = testUtils.scanMathRegions(text);
+    assert.strictEqual(regions.length, 2, 'Expected two math regions outside inline code');
+    assert.deepStrictEqual(
+      regions.map(r => r.source),
+      ['a', 'c'],
+      'Math sources should exclude inline-code $ spans'
+    );
+  });
+
+  test('#92 — parse: inline and block math still detected when not inside code', async () => {
+    assert.ok(cache, 'parseCache not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: 'Inline $E=mc^2$ and block:\n\n$$\n\\sum_{i=1}^n i\n$$',
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(400);
+    const entry = cache.get(doc);
+    assert.ok(entry.mathRegions.length >= 2, 'Expected inline and block math regions');
+    assert.ok(
+      entry.mathRegions.some(r => !r.displayMode && r.source.includes('E=mc')),
+      'Expected inline math region'
+    );
+    assert.ok(
+      entry.mathRegions.some(r => r.displayMode),
+      'Expected block math region'
+    );
+  });
+
+  test('#80 — parse: indented code blocks inside ordered lists produce three codeBlock decorations', async () => {
+    assert.ok(cache, 'parseCache not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: issue80Markdown(),
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(500);
+    const entry = cache.get(doc);
+    const codeBlocks = entry.decorations.filter(d => d.type === 'codeBlock');
+    assert.strictEqual(
+      codeBlocks.length,
+      3,
+      `Expected 3 codeBlock decorations for nested list fences, got ${codeBlocks.length}`
+    );
+
+    const listMarkers = entry.decorations.filter(
+      d => d.type === 'listItem' || d.type === 'orderedListItem' || d.type === 'listMarker'
+    );
+    for (const marker of listMarkers) {
+      for (const block of codeBlocks) {
+        assert.ok(
+          !rangesOverlap(marker.startPos, marker.endPos, block.startPos, block.endPos),
+          'List marker decoration must not overlap a code block decoration'
+        );
+      }
+    }
+  });
+
+  test('#80 — parse: bold/italic inside indented list code fences are not decorated', async () => {
+    assert.ok(cache, 'parseCache not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: issue80Markdown(),
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(500);
+    const entry = cache.get(doc);
+    const inlineBold = entry.decorations.filter(d => d.type === 'bold' || d.type === 'boldItalic');
+    for (const bold of inlineBold) {
+      const slice = entry.text.slice(bold.startPos, bold.endPos);
+      assert.ok(
+        !slice.includes('npm start') && !slice.includes('SCENE_NAME'),
+        `Inline bold must not appear inside list code blocks, got "${slice}"`
+      );
+    }
+  });
+
+  test('#95 — testUtils.isDiffLikeUri distinguishes file vs git diff URIs', () => {
+    assert.ok(testUtils, 'testUtils not available from ext.exports');
+    assert.strictEqual(testUtils.isDiffLikeUri(vscode.Uri.file('/tmp/test.md')), false);
+    assert.strictEqual(testUtils.isDiffLikeUri(vscode.Uri.parse('git:/path/to/file.md')), true);
+    assert.strictEqual(testUtils.isDiffLikeUri(vscode.Uri.parse('vscode-diff:/path/to/file.md')), true);
+    assert.strictEqual(testUtils.isDiffLikeUri(vscode.Uri.parse('vscode-merge:/path/to/file.md')), true);
+  });
+
+  test('#95 — active markdown editor is not treated as diff view in split layout', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const docA = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '# File A\n\n**bold** text',
+    });
+    const docB = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '# File B\n\n_italic_ text',
+    });
+
+    await vscode.window.showTextDocument(docA, { viewColumn: vscode.ViewColumn.One });
+    await delay(250);
+    await vscode.window.showTextDocument(docB, { viewColumn: vscode.ViewColumn.Two });
+    await delay(250);
+    await vscode.window.showTextDocument(docA, { viewColumn: vscode.ViewColumn.One });
+    await delay(300);
+
+    assert.strictEqual(
+      decoratorApi.isActiveEditorDiffView(),
+      false,
+      'Focused markdown file must not be treated as a diff view (#95)'
+    );
+    assert.strictEqual(
+      testUtils?.isDiffLikeUri(docA.uri),
+      false,
+      'Untitled/file markdown URI must not be diff-like'
+    );
+
+    let nonEmptyTypeCount = 0;
+    decoratorApi.onApply = (count) => { nonEmptyTypeCount += count; };
+    try {
+      await vscode.commands.executeCommand('cursorMove', { to: 'right' });
+      await delay(300);
+      assert.ok(
+        nonEmptyTypeCount > 0,
+        'Decorations must still render on focused markdown when another editor is open beside it'
+      );
+    } finally {
+      decoratorApi.onApply = undefined;
+    }
+  });
+
+  test('#108 — diagram wider than viewport maxWidth is scaled down (processSvg)', () => {
+    assert.ok(svgProcessor, 'svgProcessor not available from ext.exports');
+    const viewportMaxWidth = Math.round(14 * 0.6 * 150); // ~150 cols at 14px font
+    const svg = makeSvgFixture(1400, 400);
+    const result = svgProcessor.processSvg(svg, 400, viewportMaxWidth);
+    const width = parseSvgWidth(result);
+    assert.strictEqual(
+      width,
+      viewportMaxWidth,
+      `Diagram wider than viewport must scale to ${viewportMaxWidth}px, got ${width}px`
+    );
+  });
+
+  test('#108 — estimateEditorContentWidthPx returns a bounded width for the active editor', async () => {
+    assert.ok(testUtils, 'testUtils not available from ext.exports');
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: '# Width test\n\n' + 'x'.repeat(200),
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(400);
+    const editor = vscode.window.activeTextEditor;
+    assert.ok(editor, 'Expected an active editor');
+    const width = testUtils.estimateEditorContentWidthPx(editor);
+    assert.ok(width >= 320, `Expected width floor >= 320px, got ${width}`);
+    assert.ok(width <= 4096, `Expected width ceiling <= 4096px, got ${width}`);
+    const bucket = testUtils.bucketWidthForCache(width);
+    assert.ok(bucket > 0, 'Width bucket must be positive');
+  });
+
+  test('#108 — wide flowchart LR mermaid block decorates without error', async () => {
+    const doc = await vscode.workspace.openTextDocument({
+      language: 'markdown',
+      content: [
+        '# Wide Mermaid',
+        '',
+        '```mermaid',
+        'flowchart LR',
+        '  A[Start] --> B[Process]',
+        '  B --> C[More]',
+        '  C --> D[Even More]',
+        '  D --> E[End]',
+        '```',
+      ].join('\n'),
+    });
+    await vscode.window.showTextDocument(doc);
+    await delay(800);
+    assert.strictEqual(doc.languageId, 'markdown');
+    assert.ok(cache, 'parseCache not available from ext.exports');
+    const entry = cache.get(doc);
+    assert.ok(
+      entry.mermaidBlocks.length >= 1,
+      'Expected at least one mermaid block in parse cache'
+    );
+  });
+
+  test('#114 — ghostLinks.collapse applies hide instead of ghostFaint for link syntax on active line', async () => {
+    assert.ok(cache && testUtils, 'parseCache/testUtils not available from ext.exports');
+    const text = '[FAQ](https://example.com/faq) and [Reviews](https://example.com/reviews)';
+    const doc = await vscode.workspace.openTextDocument({ language: 'markdown', content: text });
+    await vscode.window.showTextDocument(doc);
+    await delay(400);
+
+    const editor = vscode.window.activeTextEditor;
+    assert.ok(editor, 'Expected active editor');
+    editor.selection = new vscode.Selection(new vscode.Position(0, text.length), new vscode.Position(0, text.length));
+
+    const entry = cache.get(doc);
+    const scopeEntries = buildScopeEntries(doc, entry.scopes);
+    const filtered = testUtils.filterDecorationsForEditor(
+      editor,
+      entry.decorations,
+      scopeEntries,
+      entry.text,
+      (startPos, endPos) =>
+        new vscode.Range(doc.positionAt(startPos), doc.positionAt(endPos)),
+      { ghostLinksCollapse: true },
+    );
+
+    const linkDecorations = entry.decorations.filter(d => d.type === 'link');
+    assert.ok(linkDecorations.length >= 2, 'Expected link decorations in parse output');
+
+    const hideRanges = (filtered.get('hide') as unknown[] | undefined) ?? [];
+    const ghostFaintRanges = (filtered.get('ghostFaint') as unknown[] | undefined) ?? [];
+    assert.ok(hideRanges.length > 0, 'Collapsed ghost links should use hide decorations');
+    assert.strictEqual(
+      ghostFaintRanges.length,
+      0,
+      'Collapsed ghost links should not route link syntax to ghostFaint'
+    );
+  });
+
+  test('#114 — enabling ghostLinks.collapse via settings does not break decoration rendering', async () => {
+    assert.ok(decoratorApi, 'decorator not available from ext.exports');
+    const configSection = vscode.workspace.getConfiguration('markdownInlineEditor');
+    await configSection.update('decorations.ghostLinks.collapse', true, vscode.ConfigurationTarget.Global);
+    try {
+      const doc = await vscode.workspace.openTextDocument({
+        language: 'markdown',
+        content: '[One](https://a.test/one) [Two](https://a.test/two) [Three](https://a.test/three)',
+      });
+      await vscode.window.showTextDocument(doc);
+      await delay(400);
+
+      let nonEmptyTypeCount = 0;
+      decoratorApi.onApply = (count) => { nonEmptyTypeCount += count; };
+      try {
+        await vscode.commands.executeCommand('cursorMove', { to: 'right' });
+        await delay(300);
+        assert.ok(
+          nonEmptyTypeCount > 0,
+          'Decorator must still apply ranges when ghostLinks.collapse is enabled'
+        );
+      } finally {
+        decoratorApi.onApply = undefined;
+      }
+    } finally {
+      await configSection.update('decorations.ghostLinks.collapse', undefined, vscode.ConfigurationTarget.Global);
+    }
+  });
 });
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function rangesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  return aStart < bEnd && aEnd > bStart;
+}
+
+function buildScopeEntries(
+  doc: vscode.TextDocument,
+  scopes: ScopeRangeExport[],
+): Array<{ startPos: number; endPos: number; range: vscode.Range; kind?: string }> {
+  return scopes.map((scope) => ({
+    startPos: scope.startPos,
+    endPos: scope.endPos,
+    kind: scope.kind,
+    range: new vscode.Range(doc.positionAt(scope.startPos), doc.positionAt(scope.endPos)),
+  }));
+}
+
+/** Repro markdown from GitHub issue #80. */
+function issue80Markdown(): string {
+  return [
+    '1. Test scene:',
+    '',
+    '    ```sh',
+    '    npm start -- --scene=$SCENE_NAME --web',
+    '    ```',
+    '',
+    '    i.e.',
+    '',
+    '    ```sh',
+    '    npm start -- --scene=pdf --web',
+    '    ```',
+    '',
+    '2. Trigger a render locally (using case directory):',
+    '',
+    '    ```sh',
+    '    npm start -- --scene=$SCENE_NAME --case=$PATH_TO_CASE --output=$PATH_TO_OUTPUT_PNG',
+    '    ```',
+  ].join('\n');
 }
 
 /**

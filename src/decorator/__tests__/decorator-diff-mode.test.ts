@@ -1,5 +1,5 @@
 import { TextDocument, Uri } from '../../test/__mocks__/vscode';
-import { isDiffLikeUri } from '../../diff-context';
+import { isDiffLikeUri, isDiffViewVisible } from '../../diff-context';
 
 /**
  * Tests for diff mode detection functionality.
@@ -78,6 +78,34 @@ describe('Decorator - Diff Mode', () => {
     it('should not identify file scheme as diff scheme', () => {
       const fileUri = Uri.file('test.md');
       expect(isDiffLikeUri(fileUri as any)).toBe(false);
+    });
+  });
+
+  describe('active editor diff detection (#95)', () => {
+    /** Mirrors Decorator.isDiffEditor() — only the active document URI matters. */
+    function isActiveEditorInDiffMode(uri: ReturnType<typeof Uri.file>): boolean {
+      return isDiffLikeUri(uri as any);
+    }
+
+    it('should not skip decorations on markdown when another visible editor is a diff', () => {
+      const markdownUri = Uri.file('notes.md');
+      const diffUri = Uri.parse('git:/path/to/other.ts');
+
+      const visibleEditors = [
+        { document: { uri: diffUri } },
+        { document: { uri: markdownUri } },
+      ];
+
+      // Old behavior: any visible diff editor blocked all decoration updates.
+      expect(isDiffViewVisible(visibleEditors as any)).toBe(true);
+
+      // Fixed behavior: only the active editor URI is checked.
+      expect(isActiveEditorInDiffMode(markdownUri)).toBe(false);
+    });
+
+    it('should skip decorations when the active editor itself is a diff', () => {
+      const diffUri = Uri.parse('git:/path/to/file.md');
+      expect(isActiveEditorInDiffMode(diffUri as any)).toBe(true);
     });
   });
 });

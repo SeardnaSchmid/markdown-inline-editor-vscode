@@ -9,6 +9,7 @@ vi.mock('../../parser', () => ({
 import { Decorator } from '../../decorator';
 import type { DecorationRange, DecorationType } from '../../parser';
 import { isMarkerDecorationType } from '../decoration-categories';
+import { filterDecorationsForEditor } from '../visibility-model';
 import { TextDocument, TextEditor, Selection, Position, Uri, Range } from '../../test/__mocks__/vscode';
 
 type ScopeEntry = {
@@ -572,6 +573,47 @@ describe('Decorator filtering behavior', () => {
     expect(filtered.get('bold')?.length).toBe(1);
     expect(filtered.get('hide')?.length).toBe(2);
     expect(filtered.has('ghostFaint')).toBe(false);
+  });
+
+  it('collapses ghost-state link syntax when ghostLinks.collapse is enabled (#114)', () => {
+    const text = '[FAQ](https://example.com/faq) and [Reviews](https://example.com/reviews)';
+    const linkOneEnd = text.indexOf(')') + 1;
+    const linkTwoStart = text.indexOf('[Reviews]');
+    const decorations: DecorationRange[] = [
+      { startPos: 0, endPos: 1, type: 'hide' },
+      { startPos: 1, endPos: 4, type: 'link', url: 'https://example.com/faq' },
+      { startPos: 4, endPos: 5, type: 'hide' },
+      { startPos: 5, endPos: 6, type: 'hide' },
+      { startPos: 6, endPos: 28, type: 'hide' },
+      { startPos: 28, endPos: 29, type: 'hide' },
+      { startPos: linkTwoStart, endPos: linkTwoStart + 1, type: 'hide' },
+      { startPos: linkTwoStart + 1, endPos: linkTwoStart + 8, type: 'link', url: 'https://example.com/reviews' },
+      { startPos: linkTwoStart + 8, endPos: linkTwoStart + 9, type: 'hide' },
+      { startPos: linkTwoStart + 9, endPos: linkTwoStart + 10, type: 'hide' },
+      { startPos: linkTwoStart + 10, endPos: text.length - 1, type: 'hide' },
+      { startPos: text.length - 1, endPos: text.length, type: 'hide' },
+    ];
+
+    const document = new TextDocument(Uri.file('test.md'), 'markdown', 1, text);
+    const selection = new Selection(new Position(0, text.length - 1), new Position(0, text.length - 1));
+    const editor = new TextEditor(document, [selection]);
+    const scopes = [
+      { startPos: 0, endPos: linkOneEnd, range: new Range(document.positionAt(0), document.positionAt(linkOneEnd)), kind: 'link' },
+      { startPos: linkTwoStart, endPos: text.length, range: new Range(document.positionAt(linkTwoStart), document.positionAt(text.length)), kind: 'link' },
+    ];
+
+    const filtered = filterDecorationsForEditor(
+      editor as any,
+      decorations,
+      scopes as any,
+      text,
+      (startPos, endPos) => new Range(document.positionAt(startPos), document.positionAt(endPos)),
+      { ghostLinksCollapse: true },
+    );
+
+    expect(filtered.get('link')?.length).toBe(2);
+    expect(filtered.has('ghostFaint')).toBe(false);
+    expect((filtered.get('hide')?.length ?? 0)).toBeGreaterThan(0);
   });
 });
 

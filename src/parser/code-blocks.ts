@@ -2,6 +2,14 @@ import type { Code } from 'mdast';
 import { addScope, hasValidPosition } from './common';
 import type { DecorationRange, MermaidBlock, ScopeRange } from './types';
 
+type FenceMatch = {
+  fenceStart: number;
+  fenceChar: string;
+  fenceLength: number;
+};
+
+const MAX_FENCE_SEARCH_LINES = 20;
+
 export function processCodeBlock(
   node: Code,
   text: string,
@@ -15,93 +23,13 @@ export function processCodeBlock(
 
   const codeStart = node.position!.start.offset!;
   const codeEnd = node.position!.end.offset!;
-  let fenceStart = codeStart;
-  let fenceChar: string | null = null;
-  let fenceLength = 0;
-  const lineStart = text.lastIndexOf('\n', codeStart - 1) + 1;
-
-  for (let pos = lineStart; pos < codeStart && pos < text.length; pos++) {
-    const char = text[pos];
-    if (char === '`' || char === '~') {
-      let count = 1;
-      let checkPos = pos + 1;
-      while (checkPos < text.length && text[checkPos] === char && count < 20) {
-        count++;
-        checkPos++;
-      }
-      if (count >= 3) {
-        fenceStart = pos;
-        fenceChar = char;
-        fenceLength = count;
-        break;
-      }
-    }
+  const openingFence = findOpeningFence(text, codeStart);
+  if (!openingFence) {
+    return;
   }
 
-  if (!fenceChar) {
-    for (let pos = codeStart; pos < Math.min(codeStart + 20, text.length); pos++) {
-      const char = text[pos];
-      if (char === '`' || char === '~') {
-        let count = 1;
-        let checkPos = pos + 1;
-        while (checkPos < text.length && text[checkPos] === char && count < 20) {
-          count++;
-          checkPos++;
-        }
-        if (count >= 3) {
-          fenceStart = pos;
-          fenceChar = char;
-          fenceLength = count;
-          break;
-        }
-      }
-    }
-  }
-
-  if (!fenceChar || fenceLength < 3) {
-    const fallbackFence = text.indexOf('```', codeStart - 10);
-    if (fallbackFence === -1 || fallbackFence > codeStart) {
-      return;
-    }
-    fenceStart = fallbackFence;
-    fenceChar = '`';
-    fenceLength = 3;
-  }
-
-  let closingFence = -1;
-  const closingLineStart = text.lastIndexOf('\n', codeEnd - 1) + 1;
-  for (let pos = codeEnd - 1; pos >= closingLineStart && pos >= fenceStart + fenceLength; pos--) {
-    if (text[pos] === fenceChar) {
-      let count = 1;
-      let checkPos = pos - 1;
-      while (checkPos >= 0 && text[checkPos] === fenceChar && count < 20) {
-        count++;
-        checkPos--;
-      }
-      if (count >= fenceLength) {
-        closingFence = pos - count + 1;
-        break;
-      }
-    }
-  }
-
-  if (closingFence === -1) {
-    for (let pos = codeEnd; pos < Math.min(codeEnd + 20, text.length); pos++) {
-      if (text[pos] === fenceChar) {
-        let count = 1;
-        let checkPos = pos + 1;
-        while (checkPos < text.length && text[checkPos] === fenceChar && count < 20) {
-          count++;
-          checkPos++;
-        }
-        if (count >= fenceLength) {
-          closingFence = pos;
-          break;
-        }
-      }
-    }
-  }
-
+  const { fenceStart, fenceChar, fenceLength } = openingFence;
+  const closingFence = findClosingFence(text, codeEnd, fenceChar, fenceLength, fenceStart);
   if (closingFence === -1 || closingFence <= fenceStart) {
     return;
   }
@@ -208,4 +136,173 @@ export function processCodeBlock(
       numLines,
     });
   }
+}
+
+function findOpeningFence(text: string, codeStart: number): FenceMatch | null {
+  const codeLineStart = text.lastIndexOf('\n', codeStart - 1) + 1;
+
+  const sameLineFence = findFenceInRange(text, codeLineStart, codeStart);
+  if (sameLineFence) {
+    return sameLineFence;
+  }
+
+  const forwardFence = findFenceInRange(text, codeStart, Math.min(codeStart + 20, text.length));
+  if (forwardFence) {
+    return forwardFence;
+  }
+
+  let lineStart = codeLineStart;
+  for (let line = 0; line < MAX_FENCE_SEARCH_LINES && lineStart > 0; line++) {
+    const prevLineEnd = lineStart - 1;
+    lineStart = text.lastIndexOf('\n', prevLineEnd - 1) + 1;
+    const prevLineFence = findFenceInRange(text, lineStart, prevLineEnd + 1);
+    if (prevLineFence) {
+      return prevLineFence;
+    }
+  }
+
+  const fallbackFence = text.indexOf('```', Math.max(0, codeStart - 10));
+  if (fallbackFence !== -1 && fallbackFence <= codeStart) {
+    return {
+      fenceStart: fallbackFence,
+      fenceChar: '`',
+      fenceLength: 3,
+    };
+  }
+
+  return null;
+}
+
+function findClosingFence(
+  text: string,
+  codeEnd: number,
+  fenceChar: string,
+  fenceLength: number,
+  fenceStart: number,
+): number {
+  const closingLineStart = text.lastIndexOf('\n', codeEnd - 1) + 1;
+  const sameLineClosing = findClosingFenceInRange(
+    text,
+    closingLineStart,
+    codeEnd,
+    fenceChar,
+    fenceLength,
+    fenceStart,
+    true,
+  );
+  if (sameLineClosing !== -1) {
+    return sameLineClosing;
+  }
+
+  const forwardClosing = findClosingFenceInRange(
+    text,
+    codeEnd,
+    Math.min(codeEnd + 20, text.length),
+    fenceChar,
+    fenceLength,
+    fenceStart,
+    false,
+  );
+  if (forwardClosing !== -1) {
+    return forwardClosing;
+  }
+
+  let lineEnd = text.indexOf('\n', codeEnd);
+  if (lineEnd === -1) {
+    lineEnd = text.length;
+  }
+
+  for (let line = 0; line < MAX_FENCE_SEARCH_LINES && lineEnd < text.length; line++) {
+    const nextLineStart = lineEnd + 1;
+    if (nextLineStart >= text.length) {
+      break;
+    }
+    const nextLineEnd = text.indexOf('\n', nextLineStart);
+    const lineLimit = nextLineEnd === -1 ? text.length : nextLineEnd;
+    const closing = findClosingFenceInRange(
+      text,
+      nextLineStart,
+      lineLimit,
+      fenceChar,
+      fenceLength,
+      fenceStart,
+      false,
+    );
+    if (closing !== -1) {
+      return closing;
+    }
+    if (nextLineEnd === -1) {
+      break;
+    }
+    lineEnd = nextLineEnd;
+  }
+
+  return -1;
+}
+
+function findFenceInRange(text: string, start: number, end: number): FenceMatch | null {
+  for (let pos = start; pos < end && pos < text.length; pos++) {
+    const char = text[pos];
+    if (char !== '`' && char !== '~') {
+      continue;
+    }
+    let count = 1;
+    let checkPos = pos + 1;
+    while (checkPos < text.length && text[checkPos] === char && count < 20) {
+      count++;
+      checkPos++;
+    }
+    if (count >= 3) {
+      return {
+        fenceStart: pos,
+        fenceChar: char,
+        fenceLength: count,
+      };
+    }
+  }
+  return null;
+}
+
+function findClosingFenceInRange(
+  text: string,
+  start: number,
+  end: number,
+  fenceChar: string,
+  fenceLength: number,
+  fenceStart: number,
+  searchBackward: boolean,
+): number {
+  if (searchBackward) {
+    for (let pos = end - 1; pos >= start && pos >= fenceStart + fenceLength; pos--) {
+      if (text[pos] !== fenceChar) {
+        continue;
+      }
+      let count = 1;
+      let checkPos = pos - 1;
+      while (checkPos >= 0 && text[checkPos] === fenceChar && count < 20) {
+        count++;
+        checkPos--;
+      }
+      if (count >= fenceLength) {
+        return pos - count + 1;
+      }
+    }
+    return -1;
+  }
+
+  for (let pos = start; pos < end && pos < text.length; pos++) {
+    if (text[pos] !== fenceChar) {
+      continue;
+    }
+    let count = 1;
+    let checkPos = pos + 1;
+    while (checkPos < text.length && text[checkPos] === fenceChar && count < 20) {
+      count++;
+      checkPos++;
+    }
+    if (count >= fenceLength) {
+      return pos;
+    }
+  }
+  return -1;
 }

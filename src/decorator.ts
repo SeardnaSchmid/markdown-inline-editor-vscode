@@ -1,7 +1,7 @@
-import { DecorationOptions, Range, TextEditor, TextDocument, TextDocumentChangeEvent, window, TextEditorSelectionChangeKind, Memento } from 'vscode';
+import { DecorationOptions, Range, TextEditor, TextDocument, TextDocumentChangeEvent, TextEditorSelectionChangeKind, Memento } from 'vscode';
 import { DecorationRange, DecorationType, MermaidBlock, MathRegion, ScopeRange } from './parser';
 import { config } from './config';
-import { isDiffLikeUri, isDiffViewVisible } from './diff-context';
+import { isDiffLikeUri } from './diff-context';
 import { MarkdownParseCache } from './markdown-parse-cache';
 import {
   applyFilteredDecorations,
@@ -21,6 +21,7 @@ import { MermaidHoverIndicatorDecorationType } from './decorations';
 import { isSupportedMarkdownLanguage } from './language-support';
 import { logDebug, logPerformanceMetric } from './logging';
 import { applyMathDecorationsForEditor } from './decorator/math-region-application';
+import { clearMermaidDecorationCache as clearMermaidRenderCache } from './mermaid/mermaid-renderer';
 
 /**
  * Performance and caching constants.
@@ -221,6 +222,13 @@ export class Decorator {
   }
 
   /**
+   * Exposed for integration tests — whether the active editor is a diff/merge document.
+   */
+  isActiveEditorDiffView(): boolean {
+    return this.isDiffEditor();
+  }
+
+  /**
    * Get the enabled state for a specific file URI, loading from persisted
    * state on first access.
    *
@@ -381,28 +389,22 @@ export class Decorator {
   }
 
   /**
-   * Detects if the current editor is viewing a diff.
-   * 
-   * For side-by-side diff views, checks ALL visible editors to see if any
-   * are in a diff context. This ensures both sides of the diff have
-   * decorations disabled, regardless of which side is currently active.
-   * 
+   * Detects if the active editor is viewing a diff.
+   *
+   * Only the active editor's document URI is checked so decorations remain
+   * enabled on a normal markdown file open beside an unrelated diff preview (#95).
+   * Side-by-side diff of the same file still skips decorations because both panes
+   * use diff URIs.
+   *
    * @private
-   * @returns {boolean} True if editor is in diff mode
+   * @returns {boolean} True if the active editor is in diff mode
    */
   private isDiffEditor(): boolean {
     if (!this.activeEditor) {
       return false;
     }
 
-    if (isDiffLikeUri(this.activeEditor.document.uri)) {
-      return true;
-    }
-
-    // For side-by-side diff views, check all visible editors
-    // If ANY visible editor is in a diff context, we're in a diff view
-    // This ensures both sides of the diff have decorations disabled
-    return isDiffViewVisible(window.visibleTextEditors);
+    return isDiffLikeUri(this.activeEditor.document.uri);
   }
 
   /**
@@ -490,7 +492,8 @@ export class Decorator {
       decorations,
       scopes,
       originalText,
-      (startPos, endPos, text) => this.createRange(startPos, endPos, text)
+      (startPos, endPos, text) => this.createRange(startPos, endPos, text),
+      { ghostLinksCollapse: config.decorations.ghostLinksCollapse() }
     );
   }
 
@@ -515,6 +518,14 @@ export class Decorator {
     if (this.activeEditor) {
       this.mathDecorations.clear(this.activeEditor);
     }
+    this.updateDecorationsForSelection();
+  }
+
+  /**
+   * Clears the Mermaid decoration cache and forces re-render at the current viewport width.
+   */
+  clearMermaidDecorationCache(): void {
+    clearMermaidRenderCache();
     this.updateDecorationsForSelection();
   }
 
