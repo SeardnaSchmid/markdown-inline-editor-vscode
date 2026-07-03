@@ -28,7 +28,7 @@ export function registerEventHandlers(
       if (event.affectsConfiguration('markdownInlineEditor.defaultBehaviors.diffView.applyDecorations')) {
         const diffViewApplyDecorations = config.diffView.applyDecorations();
         decorator.updateDiffViewDecorationSetting(!diffViewApplyDecorations);
-        decorator.updateDecorationsForSelection();
+        decorator.refreshDecorations();
       }
 
       if (event.affectsConfiguration('markdownInlineEditor.decorations.ghostFaintOpacity')) {

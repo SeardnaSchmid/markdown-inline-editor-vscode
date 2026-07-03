@@ -3,6 +3,7 @@ import { config } from '../../config';
 import {
   applyFilteredDecorations,
   buildScopeEntries,
+  clearAppliedDecorationCache,
   createRange,
   isSelectionOrCursorInsideOffsets,
 } from '../editor-decoration-applier';
@@ -180,5 +181,59 @@ describe('editor-decoration-applier', () => {
     applyFilteredDecorations(editor as any, new Map<any, any>(), registry as any);
 
     expect(editor.setDecorations).toHaveBeenCalledWith(emojiType, []);
+  });
+
+  it('skips setDecorations when filtered ranges are unchanged', () => {
+    const document = new (vscode.TextDocument as any)(
+      vscode.Uri.file('/test-skip.md'),
+      'markdown',
+      1,
+      'hello'
+    );
+    const editor = new (vscode.TextEditor as any)(document, []);
+    editor.setDecorations = vi.fn();
+
+    const hideType = { key: 'hide' };
+    const registry = {
+      getMap: () => new Map<any, any>([['hide', hideType]]),
+      getGhostFaintDecorationType: () => ({ key: 'ghostFaint' }),
+    };
+    const hideRange = new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 1));
+    const filtered = new Map<any, any>([['hide', [hideRange]]]);
+
+    applyFilteredDecorations(editor as any, filtered, registry as any);
+    expect(editor.setDecorations).toHaveBeenCalledTimes(2);
+
+    editor.setDecorations.mockClear();
+    applyFilteredDecorations(editor as any, filtered, registry as any);
+    expect(editor.setDecorations).not.toHaveBeenCalled();
+  });
+
+  it('re-applies decorations after clearAppliedDecorationCache', () => {
+    const document = new (vscode.TextDocument as any)(
+      vscode.Uri.file('/test-clear.md'),
+      'markdown',
+      1,
+      'hello'
+    );
+    const editor = new (vscode.TextEditor as any)(document, []);
+    editor.setDecorations = vi.fn();
+
+    const hideType = { key: 'hide' };
+    const registry = {
+      getMap: () => new Map<any, any>([['hide', hideType]]),
+      getGhostFaintDecorationType: () => ({ key: 'ghostFaint' }),
+    };
+    const hideRange = new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 1));
+    const filtered = new Map<any, any>([['hide', [hideRange]]]);
+
+    applyFilteredDecorations(editor as any, filtered, registry as any);
+    editor.setDecorations.mockClear();
+    applyFilteredDecorations(editor as any, filtered, registry as any);
+    expect(editor.setDecorations).not.toHaveBeenCalled();
+
+    clearAppliedDecorationCache(document.uri.toString());
+    applyFilteredDecorations(editor as any, filtered, registry as any);
+    expect(editor.setDecorations).toHaveBeenCalledTimes(2);
   });
 });

@@ -6,6 +6,7 @@ import { MarkdownParseCache } from './markdown-parse-cache';
 import {
   applyFilteredDecorations,
   buildScopeEntries,
+  clearAppliedDecorationCache,
   createRange as createEditorRange,
   isSelectionOrCursorInsideOffsets as selectionIntersectsOffsets,
 } from './decorator/editor-decoration-applier';
@@ -72,6 +73,10 @@ export class Decorator {
   private mermaidHoverIndicatorDecorationType = MermaidHoverIndicatorDecorationType();
   private readonly fileDecorationState: FileDecorationStateStore;
   private readonly updateScheduler: DecoratorUpdateScheduler;
+  private scopeEntriesCache:
+    | { uri: string; version: number; entries: ScopeEntry[] }
+    | undefined;
+  private lastSelectionIntersectsAsyncBlocks = false;
 
   constructor(parseCache: MarkdownParseCache, workspaceState?: Memento) {
     this.parseCache = parseCache;
@@ -122,9 +127,10 @@ export class Decorator {
     }
 
     this.activeEditor = textEditor;
+    this.lastSelectionIntersectsAsyncBlocks = false;
 
-    // Update immediately when switching editors (no debounce)
-    this.updateDecorationsForSelection();
+    // Full refresh when switching editors (Mermaid/math must render for the new file)
+    this.updateDecorationsInternal();
   }
 
   /**
@@ -152,7 +158,15 @@ export class Decorator {
       return;
     }
 
-    // Immediate update without debounce for selection changes
+    // Lightweight path: re-filter cached decorations, skip Mermaid/math unless needed
+    this.updateDecorationsForSelectionInternal();
+  }
+
+  /**
+   * Full decoration refresh (parse if needed, Mermaid, math).
+   * Use after config or theme changes, not for cursor/selection moves.
+   */
+  refreshDecorations(): void {
     this.updateDecorationsInternal();
   }
 
@@ -199,10 +213,8 @@ export class Decorator {
     const next = this.fileDecorationState.toggle(uri);
 
     if (next) {
-      // Re-enable: update decorations immediately
-      this.updateDecorationsForSelection();
+      this.updateDecorationsInternal();
     } else {
-      // Disable: clear all decorations
       this.clearAllDecorations();
     }
 
@@ -260,6 +272,10 @@ export class Decorator {
       return;
     }
 
+    clearAppliedDecorationCache(this.activeEditor.document.uri.toString());
+    this.scopeEntriesCache = undefined;
+    this.lastSelectionIntersectsAsyncBlocks = false;
+
     // Set all decoration types to empty arrays
     for (const decorationType of this.decorationTypes.getMap().values()) {
       this.activeEditor.setDecorations(decorationType, []);
@@ -273,65 +289,80 @@ export class Decorator {
   }
 
   /**
-   * Internal method that performs the actual decoration update.
-   * This orchestrates parsing, filtering, and application.
+   * Lightweight update for selection/cursor moves when document content is unchanged.
+   * Re-filters cached decorations and skips Mermaid/math unless the selection
+   * enters or leaves an async-rendered block.
    */
-  private updateDecorationsInternal() {
-    if (!this.activeEditor) {
+  private updateDecorationsForSelectionInternal(): void {
+    const context = this.prepareDecorationUpdate();
+    if (!context) {
       return;
     }
 
-    const document = this.activeEditor.document;
-
-    // Early exit if decorations are disabled for this file
-    if (!this.isEnabledForUri(document.uri.toString())) {
-      logDebug('skip decoration update for disabled file', { uri: document.uri.toString() });
-      return;
-    }
-
-    // Early exit for non-markdown files
-    if (!this.isMarkdownDocument()) {
-      return;
-    }
-
-    // Check if we should skip decorations in diff mode
-    if (this.skipDecorationsInDiffView && this.isDiffEditor()) {
-      logDebug('skip decoration update in diff view', { uri: document.uri.toString() });
-      this.clearAllDecorations();
-      return;
-    }
-
-    // Parse document (uses cache if version unchanged)
+    const { document, version, decorations, scopes, text, mermaidBlocks, mathRegions } = context;
     const cycleStart = Date.now();
-    const version = document.version;
-    const { decorations, scopes, text, mermaidBlocks, mathRegions } = this.parseDocument(document);
-    const parseDurationMs = Date.now() - cycleStart;
-
-    // Re-validate version before applying (race condition protection)
-    if (document.version !== version) {
-      logDebug('skip stale decoration update', {
-        uri: document.uri.toString(),
-        scheduledVersion: version,
-        currentVersion: document.version,
-      });
-      return; // Document changed during parse, skip this update
-    }
-
-    // Filter decorations based on selections (pass original text for offset adjustment)
-    const filterStart = Date.now();
     const filtered = this.filterDecorations(decorations, scopes, text);
-    const filterDurationMs = Date.now() - filterStart;
+    const filterDurationMs = Date.now() - cycleStart;
 
-    // Apply decorations
     this.applyDecorations(filtered);
-    if (config.math.enabled() && mathRegions.length > 0) {
-      this.applyMathDecorations(mathRegions, text);
-    } else {
-      if (this.activeEditor) {
+
+    const intersectsAsyncBlocks = this.selectionIntersectsAsyncBlocks(
+      mermaidBlocks,
+      mathRegions,
+      text
+    );
+    const asyncBlocksUpdated = intersectsAsyncBlocks || this.lastSelectionIntersectsAsyncBlocks;
+    if (asyncBlocksUpdated) {
+      if (config.math.enabled() && mathRegions.length > 0) {
+        this.applyMathDecorations(mathRegions, text);
+      } else if (this.activeEditor) {
         this.mathDecorations.clear(this.activeEditor);
       }
+      void this.updateMermaidDiagrams(mermaidBlocks, text, version);
     }
-    void this.updateMermaidDiagrams(mermaidBlocks, text, document.version);
+    this.lastSelectionIntersectsAsyncBlocks = intersectsAsyncBlocks;
+
+    if (config.debug.performanceEnabled()) {
+      logPerformanceMetric('decorator.update.selection', {
+        uri: document.uri.toString(),
+        version,
+        filterMs: filterDurationMs,
+        totalMs: Date.now() - cycleStart,
+        decorations: decorations.length,
+        scopes: scopes.length,
+        asyncBlocksUpdated: asyncBlocksUpdated,
+      });
+    }
+  }
+
+  /**
+   * Full decoration update after document changes or when async blocks must refresh.
+   */
+  private updateDecorationsInternal(): void {
+    const context = this.prepareDecorationUpdate();
+    if (!context) {
+      return;
+    }
+
+    const { document, version, decorations, scopes, text, mermaidBlocks, mathRegions, parseDurationMs } =
+      context;
+    const cycleStart = Date.now();
+    const filtered = this.filterDecorations(decorations, scopes, text);
+    const filterDurationMs = Date.now() - cycleStart;
+
+    this.applyDecorations(filtered, true);
+    if (config.math.enabled() && mathRegions.length > 0) {
+      this.applyMathDecorations(mathRegions, text);
+    } else if (this.activeEditor) {
+      this.mathDecorations.clear(this.activeEditor);
+    }
+    void this.updateMermaidDiagrams(mermaidBlocks, text, version);
+    this.lastSelectionIntersectsAsyncBlocks = this.selectionIntersectsAsyncBlocks(
+      mermaidBlocks,
+      mathRegions,
+      text
+    );
+
     if (config.debug.performanceEnabled()) {
       logPerformanceMetric('decorator.update', {
         uri: document.uri.toString(),
@@ -346,6 +377,89 @@ export class Decorator {
         filteredDecorationTypes: filtered.size,
       });
     }
+  }
+
+  private prepareDecorationUpdate():
+    | {
+        document: TextDocument;
+        version: number;
+        decorations: DecorationRange[];
+        scopes: ScopeEntry[];
+        text: string;
+        mermaidBlocks: MermaidBlock[];
+        mathRegions: MathRegion[];
+        parseDurationMs: number;
+      }
+    | undefined {
+    if (!this.activeEditor) {
+      return undefined;
+    }
+
+    const document = this.activeEditor.document;
+
+    if (!this.isEnabledForUri(document.uri.toString())) {
+      logDebug('skip decoration update for disabled file', { uri: document.uri.toString() });
+      return undefined;
+    }
+
+    if (!this.isMarkdownDocument()) {
+      return undefined;
+    }
+
+    if (this.skipDecorationsInDiffView && this.isDiffEditor()) {
+      logDebug('skip decoration update in diff view', { uri: document.uri.toString() });
+      this.clearAllDecorations();
+      return undefined;
+    }
+
+    const parseStart = Date.now();
+    const version = document.version;
+    const parsed = this.parseDocument(document);
+    const parseDurationMs = Date.now() - parseStart;
+
+    if (document.version !== version) {
+      logDebug('skip stale decoration update', {
+        uri: document.uri.toString(),
+        scheduledVersion: version,
+        currentVersion: document.version,
+      });
+      return undefined;
+    }
+
+    return {
+      document,
+      version,
+      parseDurationMs,
+      ...parsed,
+    };
+  }
+
+  private selectionIntersectsAsyncBlocks(
+    mermaidBlocks: MermaidBlock[],
+    mathRegions: MathRegion[],
+    text: string
+  ): boolean {
+    if (!this.activeEditor) {
+      return false;
+    }
+
+    const { selections, document } = this.activeEditor;
+
+    for (const block of mermaidBlocks) {
+      if (selectionIntersectsOffsets(block.startPos, block.endPos, text, selections, document)) {
+        return true;
+      }
+    }
+
+    if (config.math.enabled()) {
+      for (const region of mathRegions) {
+        if (selectionIntersectsOffsets(region.startPos, region.endPos, text, selections, document)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -421,7 +535,24 @@ export class Decorator {
     mathRegions: MathRegion[];
   } {
     const entry = this.parseCache.get(document);
-    const scopeEntries = this.buildScopeEntries(entry.scopes, entry.text);
+    const uri = document.uri.toString();
+    let scopeEntries: ScopeEntry[];
+
+    if (
+      this.scopeEntriesCache &&
+      this.scopeEntriesCache.uri === uri &&
+      this.scopeEntriesCache.version === document.version
+    ) {
+      scopeEntries = this.scopeEntriesCache.entries;
+    } else {
+      scopeEntries = this.buildScopeEntries(entry.scopes, entry.text);
+      this.scopeEntriesCache = {
+        uri,
+        version: document.version,
+        entries: scopeEntries,
+      };
+    }
+
     return {
       decorations: entry.decorations,
       scopes: scopeEntries,
@@ -500,11 +631,20 @@ export class Decorator {
    * @private
    * @param {Map<DecorationType, Array<Range | DecorationOptions>>} filteredDecorations - Decorations grouped by type
    */
-  private applyDecorations(filteredDecorations: Map<DecorationType, Array<Range | DecorationOptions>>) {
+  private applyDecorations(
+    filteredDecorations: Map<DecorationType, Array<Range | DecorationOptions>>,
+    force = false
+  ) {
     if (!this.activeEditor) {
       return;
     }
-    applyFilteredDecorations(this.activeEditor, filteredDecorations, this.decorationTypes, this.onApply);
+    applyFilteredDecorations(
+      this.activeEditor,
+      filteredDecorations,
+      this.decorationTypes,
+      this.onApply,
+      force
+    );
   }
 
   /**
@@ -515,7 +655,7 @@ export class Decorator {
     if (this.activeEditor) {
       this.mathDecorations.clear(this.activeEditor);
     }
-    this.updateDecorationsForSelection();
+    this.updateDecorationsInternal();
   }
 
   /**
@@ -526,6 +666,10 @@ export class Decorator {
    */
   private invalidateCache(document: TextDocument): void {
     this.parseCache.invalidate(document);
+    if (this.scopeEntriesCache?.uri === document.uri.toString()) {
+      this.scopeEntriesCache = undefined;
+    }
+    clearAppliedDecorationCache(document.uri.toString());
   }
 
   /**
@@ -586,10 +730,10 @@ export class Decorator {
 
   recreateCodeDecorationType(): void {
     this.decorationTypes.recreateCodeDecorationType();
+    clearAppliedDecorationCache(this.activeEditor?.document.uri.toString());
 
-    // Reapply decorations with the new decoration type
     if (this.activeEditor && this.isMarkdownDocument()) {
-      this.updateDecorationsForSelection();
+      this.updateDecorationsInternal();
     }
   }
 
@@ -598,8 +742,9 @@ export class Decorator {
    */
   recreateLinkDecorationType(): void {
     this.decorationTypes.recreateLinkDecorationType();
+    clearAppliedDecorationCache(this.activeEditor?.document.uri.toString());
     if (this.activeEditor && this.isMarkdownDocument()) {
-      this.updateDecorationsForSelection();
+      this.updateDecorationsInternal();
     }
   }
 
@@ -609,8 +754,9 @@ export class Decorator {
    */
   recreateColorDependentTypes(): void {
     this.decorationTypes.recreateColorDependentTypes();
+    clearAppliedDecorationCache(this.activeEditor?.document.uri.toString());
     if (this.activeEditor && this.isMarkdownDocument()) {
-      this.updateDecorationsForSelection();
+      this.updateDecorationsInternal();
     }
   }
 
@@ -620,8 +766,9 @@ export class Decorator {
    */
   recreateGhostFaintDecorationType(): void {
     this.decorationTypes.recreateGhostFaintDecorationType();
+    clearAppliedDecorationCache(this.activeEditor?.document.uri.toString());
     if (this.activeEditor && this.isMarkdownDocument()) {
-      this.updateDecorationsForSelection();
+      this.updateDecorationsInternal();
     }
   }
 
@@ -631,8 +778,9 @@ export class Decorator {
    */
   recreateFrontmatterDelimiterDecorationType(): void {
     this.decorationTypes.recreateFrontmatterDelimiterDecorationType();
+    clearAppliedDecorationCache(this.activeEditor?.document.uri.toString());
     if (this.activeEditor && this.isMarkdownDocument()) {
-      this.updateDecorationsForSelection();
+      this.updateDecorationsInternal();
     }
   }
 
@@ -642,8 +790,9 @@ export class Decorator {
    */
   recreateCodeBlockLanguageDecorationType(): void {
     this.decorationTypes.recreateCodeBlockLanguageDecorationType();
+    clearAppliedDecorationCache(this.activeEditor?.document.uri.toString());
     if (this.activeEditor && this.isMarkdownDocument()) {
-      this.updateDecorationsForSelection();
+      this.updateDecorationsInternal();
     }
   }
 

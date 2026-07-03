@@ -11,6 +11,7 @@ describe('registerEventHandlers', () => {
     const decorator = {
       setActiveEditor: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
+      refreshDecorations: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),
       updateDiffViewDecorationSetting: vi.fn(),
@@ -70,6 +71,7 @@ describe('registerEventHandlers', () => {
     const decorator = {
       setActiveEditor: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
+      refreshDecorations: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),
       updateDiffViewDecorationSetting: vi.fn(),
@@ -118,6 +120,7 @@ describe('registerEventHandlers', () => {
     const decorator = {
       setActiveEditor: vi.fn(),
       updateDecorationsForSelection: vi.fn(),
+      refreshDecorations: vi.fn(),
       updateDecorationsFromChange: vi.fn(),
       renameFile: vi.fn(),
       updateDiffViewDecorationSetting: vi.fn(),
@@ -150,7 +153,7 @@ describe('registerEventHandlers', () => {
     themeListener?.();
 
     expect(decorator.updateDiffViewDecorationSetting).toHaveBeenCalledWith(true);
-    expect(decorator.updateDecorationsForSelection).toHaveBeenCalled();
+    expect(decorator.refreshDecorations).toHaveBeenCalled();
     expect(decorator.recreateGhostFaintDecorationType).toHaveBeenCalled();
     expect(decorator.recreateFrontmatterDelimiterDecorationType).toHaveBeenCalled();
     expect(decorator.recreateCodeBlockLanguageDecorationType).toHaveBeenCalled();
