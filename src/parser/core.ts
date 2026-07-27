@@ -33,6 +33,7 @@ import {
   scanMentionAndIssueRefs as scanMentionAndIssueRefsHelper,
 } from "./mentions";
 import {
+  CELL_PADDING_CH,
   cellHasMixedFormatting as cellHasMixedFormattingHelper,
   computeColumnWidths as computeColumnWidthsHelper,
   detectCellStyle as detectCellStyleHelper,
@@ -1364,17 +1365,28 @@ export class MarkdownParser {
    * @returns Array of column widths (one per column, minimum 3)
    */
   private computeColumnWidths(tableNode: Table, source: string): number[] {
-    return computeColumnWidthsHelper(tableNode, source);
+    return computeColumnWidthsHelper(tableNode, source, {
+      cjkWidthRatio: config.tables.cjkWidthRatio(),
+      maxColumnWidth: config.tables.style() === "preview"
+        ? config.tables.maxColumnWidth()
+        : undefined,
+    });
   }
 
   /**
    * Processes a GFM table node and emits decorations for pipes, cells, and the separator row.
    *
-   * Produces:
-   * - `tablePipe` decorations for `|` in header and data rows (replaced with `│`)
-   * - `tableSeparatorPipe` decorations for `|` in the separator row (replaced with `├`, `┼`, or `┤`)
-   * - `tableSeparatorDash` decorations for dash segments in the separator row (replaced with `─` repeats)
-   * - `tableCell` decorations for cell content (padded to uniform column width)
+   * In `preview` style (the default) the result mirrors the markdown preview:
+   * - `tablePipe` / `tableSeparatorPipe` decorations that hide the `|` characters
+   * - `tableCell` decorations carrying the plain cell text plus the box width, alignment
+   *   and header flag; the renderer lays each cell out as a fixed-width box so columns
+   *   line up regardless of how the editor font renders full-width characters
+   * - one `tableRule` decoration replacing the whole separator row with a horizontal line
+   *
+   * In `grid` style the original character-grid output is produced instead:
+   * - `tablePipe` / `tableSeparatorPipe` replaced with `│`
+   * - `tableSeparatorDash` replaced with runs of `-`
+   * - `tableCell` padded with non-breaking spaces to a uniform column width
    *
    * Also adds a scope for the entire table so the visibility model can reveal the
    * whole block when the cursor is inside it.
@@ -1397,6 +1409,11 @@ export class MarkdownParser {
     const tableEnd = node.position!.end.offset!;
     const colWidths = this.computeColumnWidths(node, text);
     const colAligns = node.align ?? [];
+    const isPreviewStyle = config.tables.style() === "preview";
+    const drawRowSeparators = isPreviewStyle && config.tables.rowSeparators();
+    // Each preview cell box is the content width plus one character width of padding
+    // on either side, which stands in for the hidden pipe.
+    const boxWidthOf = (colWidth: number): number => colWidth + CELL_PADDING_CH * 2;
 
     this.addScope(scopes, tableStart, tableEnd, "table");
 
@@ -1425,7 +1442,8 @@ export class MarkdownParser {
             startPos: pipes[pIdx],
             endPos: pipes[pIdx] + 1,
             type: "tablePipe",
-            replacement: "\u2502", // │
+            // Preview style hides the pipe; padding inside the cell boxes replaces it.
+            replacement: isPreviewStyle ? "" : "\u2502", // │
           });
         }
       }
@@ -1449,9 +1467,25 @@ export class MarkdownParser {
         const displayContent = (astCell && !showRaw)
           ? this.extractCellPlainText(astCell)
           : trimmedContent;
+        const align = i < colAligns.length ? colAligns[i] : null;
+
+        if (isPreviewStyle) {
+          decorations.push({
+            startPos: cellRangeStart,
+            endPos: cellRangeEnd,
+            type: "tableCell",
+            replacement: displayContent,
+            cellStyle,
+            boxWidth: boxWidthOf(colWidth),
+            cellAlign: align === "right" || align === "center" ? align : "left",
+            isHeaderCell: rowIdx === 0,
+            drawRowSeparator: drawRowSeparators && rowIdx > 0,
+          });
+          continue;
+        }
+
         const displayWidth = this.measureTextWidth(displayContent);
         const totalPad = Math.max(0, colWidth - displayWidth);
-        const align = i < colAligns.length ? colAligns[i] : null;
 
         let replacement: string;
         if (align === "right") {
@@ -1496,6 +1530,26 @@ export class MarkdownParser {
         }
 
         const trimmedSepEnd = this.trimLineEnd(text, sepLineStart, sepLineEnd);
+
+        // Preview style: the whole separator row becomes a single rule spanning the
+        // table, which doubles as the underline of the header row.
+        if (isPreviewStyle) {
+          if (trimmedSepEnd > sepLineStart) {
+            const ruleWidth = colWidths.reduce(
+              (total, colWidth) => total + boxWidthOf(colWidth),
+              0,
+            );
+            decorations.push({
+              startPos: sepLineStart,
+              endPos: trimmedSepEnd,
+              type: "tableRule",
+              replacement: "",
+              boxWidth: ruleWidth,
+            });
+          }
+          continue;
+        }
+
         const rawSepPipes = this.findPipePositions(text, sepLineStart, trimmedSepEnd);
         const { positions: sepPipes, isVirtual: sepIsVirtual } = this.normalizePipePositions(
           text, sepLineStart, trimmedSepEnd, rawSepPipes,

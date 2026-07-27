@@ -613,6 +613,24 @@ export function TableSeparatorDashDecorationType() {
 }
 
 /**
+ * Creates a decoration type for the separator row of a preview-style table.
+ *
+ * Hides the `|---|---|` line and renders a single horizontal rule spanning the table,
+ * which doubles as the underline of the header row. The rule width is supplied per range
+ * via `renderOptions.before`.
+ *
+ * @returns {vscode.TextEditorDecorationType} A decoration type for the table rule
+ */
+export function TableRuleDecorationType() {
+  return window.createTextEditorDecorationType({
+    textDecoration: 'none; display: none;',
+    before: {
+      contentText: '',
+    },
+  });
+}
+
+/**
  * Creates a decoration type for table cell content.
  *
  * Hides the original cell text (with irregular spacing) and renders

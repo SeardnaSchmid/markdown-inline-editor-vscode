@@ -148,6 +148,42 @@
           "description": "Highlight when the source marker number differs from the computed number",
           "markdownDescription": "When ordered list auto-numbering is on, use the warning color for the displayed marker when the number in the source text does not match the computed number (for example all lines use `1.` but the view shows 1., 2., 3.)."
         },
+        "markdownInlineEditor.tables.style": {
+          "type": "string",
+          "enum": [
+            "preview",
+            "grid"
+          ],
+          "enumDescriptions": [
+            "Render tables like the markdown preview: no pipes, aligned columns, bold header, thin rules",
+            "Render tables as a character grid using │ pipes and a dashed separator row"
+          ],
+          "default": "grid",
+          "description": "How GFM tables are rendered inline",
+          "markdownDescription": "How GFM tables are rendered inline.\n\n- `preview`: hides the `|` pipes and lays every cell out as a fixed-width box, so columns line up regardless of the editor font. Adds a bold header, a rule under the header row and thin row separators. Recommended for documents that mix CJK and ASCII text.\n- `grid`: the original character-grid look, which relies on the font rendering full-width characters at exactly the configured ratio."
+        },
+        "markdownInlineEditor.tables.cjkWidthRatio": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Display width of a CJK character relative to an ASCII character",
+          "markdownDescription": "Display width of a full-width (CJK) character relative to an ASCII character, used to size table columns. `2` matches fonts where a full-width glyph is exactly two half-width glyphs (for example BIZ UDGothic, UDEV Gothic, PlemolJP). Increase it if CJK text is clipped, decrease it if columns are too wide."
+        },
+        "markdownInlineEditor.tables.maxColumnWidth": {
+          "type": "number",
+          "default": 48,
+          "minimum": 3,
+          "maximum": 200,
+          "description": "Maximum table column width, in character widths",
+          "markdownDescription": "Maximum width of a single table column, in character widths. Longer cell content is clipped in the rendered view; move the cursor into the table to see the full raw text. Only used when `#markdownInlineEditor.tables.style#` is `preview`."
+        },
+        "markdownInlineEditor.tables.rowSeparators": {
+          "type": "boolean",
+          "default": true,
+          "description": "Draw a thin rule under every table row",
+          "markdownDescription": "Draw a thin rule under every table row, like the markdown preview. Only used when `#markdownInlineEditor.tables.style#` is `preview`."
+        },
         "markdownInlineEditor.mentions.enabled": {
           "type": "boolean",
           "default": true,

@@ -51,6 +51,13 @@ export function registerEventHandlers(
         decorator.recreateLinkDecorationType();
       }
 
+      if (event.affectsConfiguration('markdownInlineEditor.tables')) {
+        // Table settings change the parsed decorations themselves (column widths,
+        // replacement text), so the cached parse has to go before redrawing.
+        decorator.clearCache();
+        decorator.updateDecorationsForSelection();
+      }
+
       if (event.affectsConfiguration('markdownInlineEditor.colors')) {
         decorator.recreateColorDependentTypes();
       }

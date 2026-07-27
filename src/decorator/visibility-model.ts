@@ -1,5 +1,6 @@
 import { Range, ThemeColor, type DecorationOptions, type Position, type TextEditor } from 'vscode';
 import type { DecorationRange, DecorationType } from '../parser';
+import { CELL_PADDING_CH } from '../parser/tables';
 import { isMarkerDecorationType } from './decoration-categories';
 
 export type ScopeEntry = {
@@ -66,7 +67,7 @@ export function filterDecorationsForEditor(
 
   // Table decoration types that use per-range replacement rendering
   const tableTypes = new Set<DecorationType>([
-    'tablePipe', 'tableSeparatorPipe', 'tableSeparatorDash', 'tableCell',
+    'tablePipe', 'tableSeparatorPipe', 'tableSeparatorDash', 'tableRule', 'tableCell',
   ]);
 
   // For table blocks, if cursor/selection is on ANY line in the table,
@@ -214,6 +215,11 @@ export function filterDecorationsForEditor(
           if (decoration.cellStyle.fontStyle) beforeOpts.fontStyle = decoration.cellStyle.fontStyle;
           if (decoration.cellStyle.textDecoration) beforeOpts.textDecoration = decoration.cellStyle.textDecoration;
         }
+        if (decoration.type === 'tableRule') {
+          applyTableRuleStyle(beforeOpts, decoration);
+        } else if (decoration.type === 'tableCell' && decoration.boxWidth !== undefined) {
+          applyTableCellBoxStyle(beforeOpts, decoration);
+        }
         ranges.push({
           range,
           renderOptions: {
@@ -255,6 +261,76 @@ export function filterDecorationsForEditor(
   }
 
   return filtered;
+}
+
+/** Theme color used for the header rule and the row separators. */
+function tableRuleColor(): ThemeColor {
+  return new ThemeColor('editorWidget.border');
+}
+
+/**
+ * Lays a preview-style table cell out as a fixed-width box.
+ *
+ * Giving every cell in a column the same CSS width is what makes the columns line up:
+ * the width estimate only decides whether the text fits, never whether the grid is
+ * straight, so a font that renders full-width glyphs at an unexpected ratio no longer
+ * skews the table.
+ *
+ * @param {Record<string, unknown>} beforeOpts - Render options being built for the cell
+ * @param {DecorationRange} decoration - The cell decoration carrying box width and alignment
+ */
+function applyTableCellBoxStyle(
+  beforeOpts: Record<string, unknown>,
+  decoration: DecorationRange
+): void {
+  const styles = [
+    // The first entry is the text-decoration value itself; the rest are extra
+    // declarations injected into the same rule.
+    (beforeOpts.textDecoration as string | undefined) ?? 'none',
+    'display: inline-block',
+    'box-sizing: border-box',
+    `width: ${decoration.boxWidth}ch`,
+    `padding: 0 ${CELL_PADDING_CH}ch`,
+    'overflow: hidden',
+    'white-space: pre',
+    'vertical-align: bottom',
+    `text-align: ${decoration.cellAlign ?? 'left'}`,
+  ];
+
+  if (decoration.drawRowSeparator) {
+    styles.push('border-bottom-width: 1px', 'border-bottom-style: solid');
+    beforeOpts.borderColor = tableRuleColor();
+  }
+
+  beforeOpts.textDecoration = `${styles.join('; ')};`;
+  if (decoration.isHeaderCell) {
+    beforeOpts.fontWeight = 'bold';
+  }
+}
+
+/**
+ * Renders the separator row as a single horizontal rule spanning the table, which also
+ * serves as the underline of the header row.
+ *
+ * @param {Record<string, unknown>} beforeOpts - Render options being built for the rule
+ * @param {DecorationRange} decoration - The rule decoration carrying the table width
+ */
+function applyTableRuleStyle(
+  beforeOpts: Record<string, unknown>,
+  decoration: DecorationRange
+): void {
+  const width = decoration.boxWidth !== undefined ? `${decoration.boxWidth}ch` : '100%';
+  beforeOpts.textDecoration = [
+    'none',
+    'display: inline-block',
+    'box-sizing: border-box',
+    `width: ${width}`,
+    'height: 0.6em',
+    'vertical-align: middle',
+    'border-bottom-width: 1px',
+    'border-bottom-style: solid',
+  ].join('; ') + ';';
+  beforeOpts.borderColor = tableRuleColor();
 }
 
 function collectRawRanges(selectedRanges: Range[], scopes: ScopeEntry[]): Range[] {
