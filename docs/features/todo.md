@@ -83,6 +83,8 @@ Enable or disable decorations per file instead of globally; state persists acros
 
 Keep table columns aligned when cells contain formatted text (bold, code, italic). Hidden markup changes rendered width and currently breaks alignment.
 
+**Solved for `preview` table style** — see [`done/preview-style-tables.md`](./done/preview-style-tables.md). Sizing each cell as a fixed-width CSS box sidesteps text measurement entirely, so hidden markup no longer changes the column width, and `:---` / `:---:` / `---:` are applied with `text-align`. Still open for the default `grid` style, which pads with spaces and therefore depends on font metrics.
+
 - Measure rendered width of formatted cells (VS Code text measurement or font metrics); adjust column spacing to preserve alignment.
 - Handle mixed cells, multiple formatting in one cell, and left/center/right alignment.
 - Depends on tables feature; 1–2 weeks; feasibility moderate, usefulness high.

@@ -85,6 +85,45 @@ export const config = {
         .get<boolean>('orderedLists.warnWhenSourceNumberDiffers', true);
     },
   },
+  tables: {
+    /**
+     * `grid` (the default) keeps the box-drawing look: │ pipes and a dashed separator row.
+     * `preview` renders tables like the markdown preview instead: pipes hidden, cells laid
+     * out as fixed-width CSS boxes, bold header and horizontal rules.
+     */
+    style(): 'preview' | 'grid' {
+      const value = vscode.workspace
+        .getConfiguration(SECTION)
+        .get<string>('tables.style', 'grid');
+      return value === 'preview' ? 'preview' : 'grid';
+    },
+    /**
+     * Display width of a CJK (full-width) character relative to an ASCII character, used to
+     * estimate how wide a column box must be. 2 matches fonts where a full-width glyph is
+     * exactly two half-width glyphs.
+     */
+    cjkWidthRatio(): number {
+      const value = vscode.workspace
+        .getConfiguration(SECTION)
+        .get<number>('tables.cjkWidthRatio', 2);
+      if (typeof value !== 'number' || !Number.isFinite(value)) return 2;
+      return Math.min(3, Math.max(1, value));
+    },
+    /** Upper bound for a column box, in character widths. Longer cells are clipped. */
+    maxColumnWidth(): number {
+      const value = vscode.workspace
+        .getConfiguration(SECTION)
+        .get<number>('tables.maxColumnWidth', 48);
+      if (typeof value !== 'number' || !Number.isFinite(value)) return 48;
+      return Math.min(200, Math.max(3, Math.floor(value)));
+    },
+    /** Draw a thin rule under every data row (preview style only). */
+    rowSeparators(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('tables.rowSeparators', true);
+    },
+  },
   mentions: {
     /** If set, overrides GitHub context: true = force links on, false = force off. Unset = use git remote auto-detect. */
     linksEnabled(): boolean | undefined {

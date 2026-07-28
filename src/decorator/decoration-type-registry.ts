@@ -34,6 +34,7 @@ import {
   TablePipeDecorationType,
   TableSeparatorPipeDecorationType,
   TableSeparatorDashDecorationType,
+  TableRuleDecorationType,
   TableCellDecorationType,
 } from '../decorations';
 import type { DecorationType } from '../parser';
@@ -95,6 +96,7 @@ export class DecorationTypeRegistry {
   private tablePipeDecorationType!: TextEditorDecorationType;
   private tableSeparatorPipeDecorationType!: TextEditorDecorationType;
   private tableSeparatorDashDecorationType!: TextEditorDecorationType;
+  private tableRuleDecorationType!: TextEditorDecorationType;
   private tableCellDecorationType!: TextEditorDecorationType;
 
   private decorationTypeMap = new Map<DecorationType, TextEditorDecorationType>();
@@ -137,6 +139,7 @@ export class DecorationTypeRegistry {
     this.tablePipeDecorationType = TablePipeDecorationType();
     this.tableSeparatorPipeDecorationType = TableSeparatorPipeDecorationType();
     this.tableSeparatorDashDecorationType = TableSeparatorDashDecorationType();
+    this.tableRuleDecorationType = TableRuleDecorationType();
     this.tableCellDecorationType = TableCellDecorationType();
 
     this.decorationTypeMap = new Map<DecorationType, TextEditorDecorationType>([
@@ -172,6 +175,7 @@ export class DecorationTypeRegistry {
       ['tablePipe', this.tablePipeDecorationType],
       ['tableSeparatorPipe', this.tableSeparatorPipeDecorationType],
       ['tableSeparatorDash', this.tableSeparatorDashDecorationType],
+      ['tableRule', this.tableRuleDecorationType],
       ['tableCell', this.tableCellDecorationType],
       // Keep this last so it is applied after backgrounds.
       ['selectionOverlay', this.selectionOverlayDecorationType],

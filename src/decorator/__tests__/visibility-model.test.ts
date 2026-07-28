@@ -153,6 +153,91 @@ describe('table decoration rendering', () => {
   });
 });
 
+describe('preview-style table layout', () => {
+  function renderCell(decoration: Partial<DecorationRange>) {
+    const text = '| A |\nother';
+    const decs: DecorationRange[] = [
+      { startPos: 2, endPos: 3, type: 'tableCell', replacement: 'A', ...decoration } as any,
+    ];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    return (result.get('tableCell') as any[])[0].renderOptions?.before;
+  }
+
+  it('lays the cell out as a fixed-width box', () => {
+    const before = renderCell({ boxWidth: 8, cellAlign: 'left' });
+    expect(before.contentText).toBe('A');
+    expect(before.textDecoration).toContain('display: inline-block');
+    expect(before.textDecoration).toContain('box-sizing: border-box');
+    expect(before.textDecoration).toContain('width: 8ch');
+    expect(before.textDecoration).toContain('overflow: hidden');
+    expect(before.textDecoration).toContain('text-align: left');
+  });
+
+  it('applies the column alignment', () => {
+    expect(renderCell({ boxWidth: 8, cellAlign: 'right' }).textDecoration)
+      .toContain('text-align: right');
+    expect(renderCell({ boxWidth: 8, cellAlign: 'center' }).textDecoration)
+      .toContain('text-align: center');
+  });
+
+  it('renders header cells bold', () => {
+    expect(renderCell({ boxWidth: 8, isHeaderCell: true }).fontWeight).toBe('bold');
+    expect(renderCell({ boxWidth: 8 }).fontWeight).toBeUndefined();
+  });
+
+  it('draws a bottom border only when a row separator is requested', () => {
+    const withSeparator = renderCell({ boxWidth: 8, drawRowSeparator: true });
+    expect(withSeparator.textDecoration).toContain('border-bottom-width: 1px');
+    expect(withSeparator.borderColor).toBeDefined();
+
+    const withoutSeparator = renderCell({ boxWidth: 8 });
+    expect(withoutSeparator.textDecoration).not.toContain('border-bottom-width');
+    expect(withoutSeparator.borderColor).toBeUndefined();
+  });
+
+  it('keeps the cell style text-decoration as the base value', () => {
+    const before = renderCell({
+      boxWidth: 8,
+      cellStyle: { textDecoration: 'line-through' },
+    });
+    expect(before.textDecoration.startsWith('line-through;')).toBe(true);
+    expect(before.textDecoration).toContain('display: inline-block');
+  });
+
+  it('leaves grid-style cells untouched when no box width is given', () => {
+    const before = renderCell({ replacement: ' A ' });
+    expect(before.contentText).toBe(' A ');
+    expect(before.textDecoration).toBeUndefined();
+  });
+
+  it('renders the separator row as a rule spanning the table', () => {
+    const text = '|---|\nother';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 5, type: 'tableRule', replacement: '', boxWidth: 16 } as any,
+    ];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const before = (result.get('tableRule') as any[])[0].renderOptions?.before;
+    expect(before.contentText).toBe('');
+    expect(before.textDecoration).toContain('width: 16ch');
+    expect(before.textDecoration).toContain('border-bottom-width: 1px');
+    expect(before.borderColor).toBeDefined();
+  });
+});
+
 describe('selection overlay for codeBlock/frontmatter', () => {
   it('adds selectionOverlay when non-empty selection covers a codeBlock', () => {
     const text = '```\ncode\n```';

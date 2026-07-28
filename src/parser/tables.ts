@@ -71,24 +71,67 @@ export function detectCellStyle(
   return undefined;
 }
 
-export function measureTextWidth(plain: string): number {
+/**
+ * Display width of a full-width character relative to an ASCII character, used when the
+ * caller does not supply one. 2 matches fonts where a full-width glyph occupies exactly
+ * two half-width cells.
+ */
+export const DEFAULT_CJK_WIDTH_RATIO = 2;
+
+/**
+ * Horizontal padding inside a preview-style cell box, in character widths. It stands in
+ * for the hidden `|` and keeps neighbouring columns from touching.
+ */
+export const CELL_PADDING_CH = 1;
+
+/** Options controlling how column widths are estimated. */
+export interface TableWidthOptions {
+  /** Display width of a full-width character, relative to an ASCII character. */
+  cjkWidthRatio?: number;
+  /** Upper bound for a single column, in character widths. */
+  maxColumnWidth?: number;
+}
+
+/**
+ * Reports whether a code point is rendered full-width (East Asian Wide / Fullwidth).
+ *
+ * Covers kana, CJK ideographs, Hangul, CJK punctuation and the fullwidth forms block —
+ * the last one matters for Japanese text, where `（` and `）` are common.
+ *
+ * @param {number} code - Unicode code point
+ * @returns {boolean} True when the character occupies two character cells
+ */
+export function isFullWidth(code: number): boolean {
+  return (
+    (code >= 0x1100 && code <= 0x115f) || // Hangul Jamo
+    (code >= 0x2e80 && code <= 0x9fff) || // CJK radicals, kana, punctuation, unified ideographs
+    (code >= 0xa960 && code <= 0xa97f) || // Hangul Jamo Extended-A
+    (code >= 0xac00 && code <= 0xd7a3) || // Hangul syllables
+    (code >= 0xf900 && code <= 0xfaff) || // CJK compatibility ideographs
+    (code >= 0xfe10 && code <= 0xfe19) || // Vertical forms
+    (code >= 0xfe30 && code <= 0xfe6f) || // CJK compatibility forms, small form variants
+    (code >= 0xff00 && code <= 0xff60) || // Fullwidth forms, e.g. fullwidth parentheses
+    (code >= 0xffe0 && code <= 0xffe6) || // Fullwidth signs
+    (code >= 0x20000 && code <= 0x2fa1f) // CJK extension B and beyond
+  );
+}
+
+/**
+ * Estimates the display width of a string in character widths (ASCII character = 1).
+ *
+ * @param {string} plain - Text to measure
+ * @param {number} cjkWidthRatio - Width of a full-width character relative to an ASCII one
+ * @returns {number} Estimated width, possibly fractional
+ */
+export function measureTextWidth(
+  plain: string,
+  cjkWidthRatio: number = DEFAULT_CJK_WIDTH_RATIO,
+): number {
   let width = 0;
-  let cjkCount = 0;
   for (const char of plain) {
-    const code = char.codePointAt(0)!;
-    if (
-      (code >= 0x2e80 && code <= 0x9fff) ||
-      (code >= 0xf900 && code <= 0xfaff) ||
-      (code >= 0xfe30 && code <= 0xfe4f) ||
-      (code >= 0x20000 && code <= 0x2fa1f)
-    ) {
-      width += 2;
-      cjkCount++;
-    } else {
-      width += 1;
-    }
+    width += isFullWidth(char.codePointAt(0)!) ? cjkWidthRatio : 1;
   }
-  return width + Math.ceil(cjkCount * 0.25);
+  return width;
 }
 
 export function findPipePositions(
@@ -163,7 +206,13 @@ export function trimLineEnd(text: string, lineStart: number, lineEnd: number): n
   return end;
 }
 
-export function computeColumnWidths(tableNode: Table, source: string): number[] {
+export function computeColumnWidths(
+  tableNode: Table,
+  source: string,
+  options: TableWidthOptions = {},
+): number[] {
+  const cjkWidthRatio = options.cjkWidthRatio ?? DEFAULT_CJK_WIDTH_RATIO;
+  const maxColumnWidth = options.maxColumnWidth ?? Number.POSITIVE_INFINITY;
   let numCols = 0;
 
   for (const row of tableNode.children) {
@@ -193,12 +242,12 @@ export function computeColumnWidths(tableNode: Table, source: string): number[] 
       const displayText = (astCell && !showRaw)
         ? extractCellPlainText(astCell)
         : cellText;
-      const width = measureTextWidth(displayText);
+      const width = measureTextWidth(displayText, cjkWidthRatio);
       if (width > widths[i]) widths[i] = width;
     }
   }
 
-  return widths;
+  return widths.map((width) => Math.min(maxColumnWidth, Math.ceil(width)));
 }
 
 export function addTableScope(scopes: ScopeRange[], tableStart: number, tableEnd: number): void {
