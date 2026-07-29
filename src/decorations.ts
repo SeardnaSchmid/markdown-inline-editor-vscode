@@ -615,8 +615,9 @@ export function TableSeparatorDashDecorationType() {
 /**
  * Creates a decoration type for table cell content.
  *
- * Hides the original cell text (with irregular spacing) and renders
- * uniformly padded content via per-range `renderOptions.before.contentText`.
+ * Hides the original cell text (with irregular spacing) and renders the content
+ * via per-range `renderOptions.before` — see {@link tableCellBoxCss}, which
+ * supplies the fixed-width box that keeps columns aligned.
  *
  * @returns {vscode.TextEditorDecorationType} A decoration type for table cells
  */
@@ -627,6 +628,52 @@ export function TableCellDecorationType() {
       contentText: '',
     },
   });
+}
+
+/** Horizontal padding inside a table cell box; must match `CELL_PADDING_COLUMNS`. */
+const TABLE_CELL_PADDING = '1ch';
+
+/**
+ * Builds the CSS that turns a table cell/separator attachment into a
+ * fixed-width box.
+ *
+ * Column alignment cannot be achieved by padding with spaces: monospace editor
+ * fonts carry no CJK glyphs, so CJK falls back to a system font whose advance
+ * is a non-integer multiple of the ASCII advance (measured 1.661x for Menlo +
+ * PingFang SC, 1.437x for Korean). No whole number of spaces can express that.
+ * Sizing the attachment in `ch` instead makes the column width a box-model
+ * fact, independent of how wide the font draws the glyphs inside it.
+ *
+ * Emitted through `textDecoration`, which VS Code interpolates verbatim into
+ * the generated rule — the same CSS-injection route the checkbox decorations
+ * use. The value therefore has to start with a valid `text-decoration` value.
+ *
+ * Deliberately omits `overflow: hidden`: it would redefine the inline-block's
+ * baseline to its bottom margin edge and shift every cell vertically relative
+ * to the vertical rules. Width estimates round up (see `measureTextWidth`), so
+ * content overflowing its box is the rarer and less damaging failure.
+ *
+ * @param options.align - How content sits inside the box
+ * @param options.textDecoration - Whole-cell text decoration, e.g. `line-through`
+ * @param options.padded - Whether to inset content by one column on each side.
+ *   Cells want the breathing room; separator rules must run edge to edge or
+ *   they leave a gap after every vertical rule and overhang the next one.
+ * @returns {string} A `text-decoration` value carrying the box CSS
+ */
+export function tableCellBoxCss(options: {
+  align?: 'left' | 'center' | 'right';
+  textDecoration?: string;
+  padded?: boolean;
+} = {}): string {
+  const { align = 'left', textDecoration = 'none', padded = true } = options;
+  return [
+    textDecoration,
+    'display: inline-block',
+    'box-sizing: border-box',
+    `padding: 0 ${padded ? TABLE_CELL_PADDING : '0'}`,
+    `text-align: ${align}`,
+    'white-space: pre',
+  ].join('; ') + ';';
 }
 
 /**

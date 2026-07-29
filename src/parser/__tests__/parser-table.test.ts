@@ -23,16 +23,46 @@ describe('MarkdownParser - Tables', () => {
       });
     });
 
-    it('should create tableCell decorations with padded replacement', () => {
+    it('should replace cells with their content only, unpadded', () => {
+      // Padding lives in the cell box (CSS), not in the replacement string, so
+      // that column width no longer depends on how wide the font draws glyphs.
       const md = '| Name | Age |\n|------|-----|\n| Jo   | 5   |';
       const result = parser.extractDecorations(md);
       const cells = byType(result, 'tableCell');
-      expect(cells.length).toBeGreaterThanOrEqual(4);
+      expect(cells.map((c) => c.replacement)).toEqual(['Name', 'Age', 'Jo', '5']);
+    });
+
+    it('should give every cell in a column the same box width', () => {
+      const md = '| Name | Age |\n|------|-----|\n| Jo   | 5   |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      // Column 0 holds "Name" (4) and "Jo" (2) -> 4 content + 2 padding columns.
+      expect(cells[0].cellWidth).toBe(6);
+      expect(cells[2].cellWidth).toBe(6);
+      // Column 1 falls back to the 3-column minimum: "Age" (3) + 2 padding.
+      expect(cells[1].cellWidth).toBe(5);
+      expect(cells[3].cellWidth).toBe(5);
+    });
+
+    it('should give the separator segments the same box width as their column', () => {
+      const md = '| Name | Age |\n|------|-----|\n| Jo   | 5   |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const dashes = byType(result, 'tableSeparatorDash');
+      expect(dashes.map((d) => d.cellWidth)).toEqual([cells[0].cellWidth, cells[1].cellWidth]);
+      dashes.forEach((d) => {
+        expect(d.replacement!.length).toBe(d.cellWidth);
+      });
+    });
+
+    it('should keep empty cells non-empty so the column does not collapse', () => {
+      // A pseudo-element with empty content renders no box, which would drop
+      // the column from that row and break the grid.
+      const md = '| A |   |\n|---|---|\n|   | B |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
       cells.forEach((c) => {
-        expect(c.replacement).toBeDefined();
-        // Each cell should start and end with non-breaking space
-        expect(c.replacement!.startsWith('\u00A0')).toBe(true);
-        expect(c.replacement!.endsWith('\u00A0')).toBe(true);
+        expect(c.replacement).toBeTruthy();
       });
     });
 
@@ -53,56 +83,89 @@ describe('MarkdownParser - Tables', () => {
       '| a    |   b    |     c |',
     ].join('\n');
 
-    it('should left-align cells by default (pad right)', () => {
+    it('should left-align cells by default', () => {
       const md = '| Foo | Bar |\n|-----|-----|\n| x   | y   |';
       const result = parser.extractDecorations(md);
       const cells = byType(result, 'tableCell');
-      // Default alignment: content starts after one NBSP
-      const dataCell = cells.find((c) => c.replacement!.includes('x'));
+      const dataCell = cells.find((c) => c.replacement === 'x');
       expect(dataCell).toBeDefined();
-      // Left-aligned: starts with single NBSP then content
-      expect(dataCell!.replacement!.indexOf('x')).toBe(1);
+      expect(dataCell!.cellAlign).toBe('left');
     });
 
     it('should right-align cells when column uses ---:', () => {
       const result = parser.extractDecorations(alignedTable);
       const cells = byType(result, 'tableCell');
-      // Find a data row cell for the right-aligned column (column index 2, content "c")
-      const rightCell = cells.find((c) => c.replacement!.includes('c'));
+      const rightCell = cells.find((c) => c.replacement === 'c');
       expect(rightCell).toBeDefined();
-      // Right-aligned: content should end with single NBSP
-      expect(rightCell!.replacement!.endsWith('c\u00A0')).toBe(true);
-      // Should have leading padding
-      const leadingSpaces = rightCell!.replacement!.length - rightCell!.replacement!.trimStart().length;
-      expect(leadingSpaces).toBeGreaterThanOrEqual(1);
+      expect(rightCell!.cellAlign).toBe('right');
     });
 
     it('should center-align cells when column uses :---:', () => {
       const result = parser.extractDecorations(alignedTable);
       const cells = byType(result, 'tableCell');
-      // Find a data row cell for the center-aligned column (column index 1, content "b")
-      const centerCell = cells.find((c) => c.replacement!.includes('b'));
+      const centerCell = cells.find((c) => c.replacement === 'b');
       expect(centerCell).toBeDefined();
-      // Center-aligned: should have padding on both sides
-      const content = centerCell!.replacement!;
-      const trimmed = content.replace(/\u00A0/g, '').trim();
-      const beforeContent = content.indexOf(trimmed);
-      const afterContent = content.length - beforeContent - trimmed.length;
-      // Both sides should have at least 1 char of padding
-      expect(beforeContent).toBeGreaterThanOrEqual(1);
-      expect(afterContent).toBeGreaterThanOrEqual(1);
+      expect(centerCell!.cellAlign).toBe('center');
+    });
+
+    it('should apply the column alignment to header cells too', () => {
+      const result = parser.extractDecorations(alignedTable);
+      const cells = byType(result, 'tableCell');
+      expect(cells.find((c) => c.replacement === 'Left')!.cellAlign).toBe('left');
+      expect(cells.find((c) => c.replacement === 'Center')!.cellAlign).toBe('center');
+      expect(cells.find((c) => c.replacement === 'Right')!.cellAlign).toBe('right');
     });
   });
 
-  describe('CJK wide characters', () => {
-    it('should account for CJK double-width in column padding', () => {
-      const md = '| Name | CJK  |\n|------|------|\n| AB   | \u4F60\u597D   |';
+  describe('CJK and other wide characters', () => {
+    it('should size a CJK column at exactly two columns per character', () => {
+      // Regression: the old measurement added ceil(cjkCount * 0.25) on top of
+      // 2-per-character. That surcharge landed in the column width, widening
+      // every *other* cell in the column while leaving the CJK cell at its
+      // natural size - inverting the alignment it was meant to fix.
+      const md = '| Name | CJK |\n|---|---|\n| AB | \u4F60\u597D\u4E16\u754C |';
       const result = parser.extractDecorations(md);
       const cells = byType(result, 'tableCell');
-      // All cells should have replacement text
-      cells.forEach((c) => {
-        expect(c.replacement).toBeDefined();
-      });
+      const cjkCell = cells.find((c) => c.replacement === '\u4F60\u597D\u4E16\u754C');
+      const headerCell = cells.find((c) => c.replacement === 'CJK');
+      // 4 CJK characters = 8 columns, + 2 padding columns. No surcharge.
+      expect(cjkCell!.cellWidth).toBe(10);
+      expect(headerCell!.cellWidth).toBe(10);
+    });
+
+    it('should size Hangul columns as wide', () => {
+      // Regression: U+AC00-U+D7A3 sat above the old 0x2E80-0x9FFF cutoff.
+      const md = '| A |\n|---|\n| \uD55C\uAD6D\uC5B4 |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      expect(cells.find((c) => c.replacement === '\uD55C\uAD6D\uC5B4')!.cellWidth).toBe(8);
+    });
+
+    it('should size fullwidth forms as wide', () => {
+      // Regression: U+FF01-U+FF60 was outside every old range.
+      const md = '| A |\n|---|\n| \uFF11\uFF12\uFF13 |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      expect(cells.find((c) => c.replacement === '\uFF11\uFF12\uFF13')!.cellWidth).toBe(8);
+    });
+
+    it('should size emoji as wide', () => {
+      const md = '| Status |\n|---|\n| \u2705 ok |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      // "\u2705 ok" = 2 + 1 + 2 = 5 columns, wider than the 6-column "Status"
+      // header only once the emoji counts as 2.
+      expect(cells.find((c) => c.replacement === 'Status')!.cellWidth).toBe(8);
+    });
+
+    it('should give every cell in a mixed-script column the same width', () => {
+      const md = '| \u540D\u79F0 | V |\n|---|---|\n| \u4F60\u597D\u4E16\u754C | 1 |\n| abc | 22 |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const firstColumn = [cells[0], cells[2], cells[4]];
+      const widths = new Set(firstColumn.map((c) => c.cellWidth));
+      expect(widths.size).toBe(1);
+      expect([...widths][0]).toBe(10);
     });
   });
 
@@ -130,14 +193,14 @@ describe('MarkdownParser - Tables', () => {
       const md = '| Header   |\n|----------|\n| **bold** |';
       const result = parser.extractDecorations(md);
       const cells = byType(result, 'tableCell');
-      // "bold" (4 chars) should be padded relative to "Header" (6 chars),
-      // not "**bold**" (8 chars)
-      const boldCell = cells.find((c) => c.replacement!.includes('bold'));
+      // Width follows "bold" (4), not "**bold**" (8), so the column is sized
+      // by the longest *rendered* content: "Header" (6) + 2 padding columns.
+      const boldCell = cells.find((c) => c.replacement === 'bold');
+      const headerCell = cells.find((c) => c.replacement === 'Header');
       expect(boldCell).toBeDefined();
-      const headerCell = cells.find((c) => c.replacement!.includes('Header'));
       expect(headerCell).toBeDefined();
-      // Both replacements should be same total length (aligned columns)
-      expect(boldCell!.replacement!.length).toBe(headerCell!.replacement!.length);
+      expect(boldCell!.cellWidth).toBe(8);
+      expect(boldCell!.cellWidth).toBe(headerCell!.cellWidth);
     });
   });
 

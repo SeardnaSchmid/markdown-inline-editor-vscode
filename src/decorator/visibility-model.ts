@@ -1,6 +1,7 @@
 import { Range, ThemeColor, type DecorationOptions, type Position, type TextEditor } from 'vscode';
 import type { DecorationRange, DecorationType } from '../parser';
 import { isMarkerDecorationType } from './decoration-categories';
+import { tableCellBoxCss } from '../decorations';
 
 export type ScopeEntry = {
   startPos: number;
@@ -206,18 +207,10 @@ export function filterDecorationsForEditor(
       }
       if (decoration.replacement !== undefined) {
         const ranges = filtered.get(decoration.type) || [];
-        const beforeOpts: Record<string, unknown> = {
-          contentText: decoration.replacement,
-        };
-        if (decoration.cellStyle) {
-          if (decoration.cellStyle.fontWeight) beforeOpts.fontWeight = decoration.cellStyle.fontWeight;
-          if (decoration.cellStyle.fontStyle) beforeOpts.fontStyle = decoration.cellStyle.fontStyle;
-          if (decoration.cellStyle.textDecoration) beforeOpts.textDecoration = decoration.cellStyle.textDecoration;
-        }
         ranges.push({
           range,
           renderOptions: {
-            before: beforeOpts,
+            before: buildTableCellBefore(decoration),
           },
         });
         filtered.set(decoration.type, ranges);
@@ -255,6 +248,43 @@ export function filterDecorationsForEditor(
   }
 
   return filtered;
+}
+
+/**
+ * Builds the `before` attachment for a table cell, separator or pipe.
+ *
+ * When the parser supplied a `cellWidth`, the attachment becomes a fixed-width
+ * box (see {@link tableCellBoxCss}) so columns line up independently of how
+ * wide the font draws the content. Pipes carry no width and render as plain
+ * replacement text.
+ *
+ * A whole-cell `line-through` has to be folded into the box CSS rather than set
+ * separately: both travel on `textDecoration`, so setting them independently
+ * would make one silently overwrite the other.
+ */
+function buildTableCellBefore(decoration: DecorationRange): Record<string, unknown> {
+  const before: Record<string, unknown> = {
+    contentText: decoration.replacement,
+  };
+
+  if (decoration.cellStyle?.fontWeight) before.fontWeight = decoration.cellStyle.fontWeight;
+  if (decoration.cellStyle?.fontStyle) before.fontStyle = decoration.cellStyle.fontStyle;
+
+  if (decoration.cellWidth === undefined) {
+    if (decoration.cellStyle?.textDecoration) {
+      before.textDecoration = decoration.cellStyle.textDecoration;
+    }
+    return before;
+  }
+
+  before.width = `${decoration.cellWidth}ch`;
+  before.textDecoration = tableCellBoxCss({
+    align: decoration.cellAlign ?? 'left',
+    textDecoration: decoration.cellStyle?.textDecoration ?? 'none',
+    // The separator rule spans its whole column; only cell text is inset.
+    padded: decoration.type !== 'tableSeparatorDash',
+  });
+  return before;
 }
 
 function collectRawRanges(selectedRanges: Range[], scopes: ScopeEntry[]): Range[] {

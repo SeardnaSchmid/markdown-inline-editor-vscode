@@ -39,7 +39,6 @@ import {
   extractCellPlainText as extractCellPlainTextHelper,
   findPipePositions as findPipePositionsHelper,
   getLineRange as getLineRangeHelper,
-  measureTextWidth as measureTextWidthHelper,
   normalizePipePositions as normalizePipePositionsHelper,
   trimLineEnd as trimLineEndHelper,
 } from "./tables";
@@ -74,6 +73,13 @@ import {
   ParseResult,
   ScopeRange,
 } from "./types";
+
+/**
+ * Blank columns rendered on each side of a table cell's content, so text does
+ * not touch the vertical rules. Applied as CSS padding inside the cell box, so
+ * it is counted in the box width rather than baked into the replacement text.
+ */
+const CELL_PADDING_COLUMNS = 1;
 
 /**
  * Type for the unified processor used to parse markdown text to a Root AST node.
@@ -1290,24 +1296,6 @@ export class MarkdownParser {
   }
 
   /**
-   * Measures display width for monospace column alignment of **plain** cell text
-   * (no markdown markers — callers use `extractCellPlainText` / `detectCellStyle` paths).
-   *
-   * CJK wide characters (Unicode ranges U+2E80–U+9FFF, U+F900–U+FAFF,
-   * U+FE30–U+FE4F, U+20000–U+2FA1F) count as 2 columns; all others as 1.
-   *
-   * Adds a small per-CJK-character correction because VS Code's `before`
-   * pseudo-element renders CJK glyphs slightly wider than exactly 2x
-   * ASCII width in most monospace fonts.
-   *
-   * @param plain - Already-unmarked cell display text
-   * @returns Estimated width in monospace columns
-   */
-  private measureTextWidth(plain: string): number {
-    return measureTextWidthHelper(plain);
-  }
-
-  /**
    * Finds unescaped pipe positions within a line range.
    * Counts consecutive preceding backslashes: pipe is escaped only when
    * the count is odd (e.g. \| is escaped, \\| is not).
@@ -1449,27 +1437,19 @@ export class MarkdownParser {
         const displayContent = (astCell && !showRaw)
           ? this.extractCellPlainText(astCell)
           : trimmedContent;
-        const displayWidth = this.measureTextWidth(displayContent);
-        const totalPad = Math.max(0, colWidth - displayWidth);
         const align = i < colAligns.length ? colAligns[i] : null;
-
-        let replacement: string;
-        if (align === "right") {
-          replacement = "\u00A0".repeat(totalPad + 1) + displayContent + "\u00A0";
-        } else if (align === "center") {
-          const padLeft = Math.floor(totalPad / 2);
-          const padRight = totalPad - padLeft;
-          replacement = "\u00A0".repeat(padLeft + 1) + displayContent + "\u00A0".repeat(padRight + 1);
-        } else {
-          // left or null (default)
-          replacement = "\u00A0" + displayContent + "\u00A0".repeat(totalPad + 1);
-        }
 
         decorations.push({
           startPos: cellRangeStart,
           endPos: cellRangeEnd,
           type: "tableCell",
-          replacement,
+          // Content only - the decorator sizes the box, so no padding is
+          // baked into the string. An empty cell still needs a non-empty
+          // replacement or the pseudo-element collapses and the column
+          // disappears from that row.
+          replacement: displayContent === "" ? "\u00A0" : displayContent,
+          cellWidth: colWidth + CELL_PADDING_COLUMNS * 2,
+          cellAlign: align === "right" || align === "center" ? align : "left",
           cellStyle,
         });
       }
@@ -1525,7 +1505,8 @@ export class MarkdownParser {
             startPos: segStart,
             endPos: segEnd,
             type: "tableSeparatorDash",
-            replacement: "-".repeat(colWidth + 2),
+            replacement: "-".repeat(colWidth + CELL_PADDING_COLUMNS * 2),
+            cellWidth: colWidth + CELL_PADDING_COLUMNS * 2,
           });
         }
       }

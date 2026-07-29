@@ -11,6 +11,21 @@ export interface DecorationRange {
     fontStyle?: string;
     textDecoration?: string;
   };
+  /**
+   * Width of a table cell/separator box, in `ch` units (one `ch` = the advance
+   * width of "0" in the editor font).
+   *
+   * The decorator renders the replacement inside an inline-block of exactly
+   * this width, so columns line up regardless of how wide the font actually
+   * draws the cell's glyphs. This matters because monospace editor fonts
+   * (Menlo, Consolas, JetBrains Mono, ...) carry no CJK glyphs and fall back to
+   * a system font whose advance is not 2x the ASCII advance — measured at
+   * 1.661x for Menlo + PingFang SC, and 1.437x for Korean. Padding with spaces
+   * cannot express those ratios; a fixed-width box sidesteps them entirely.
+   */
+  cellWidth?: number;
+  /** How the replacement sits inside its {@link cellWidth} box. */
+  cellAlign?: 'left' | 'center' | 'right';
   slug?: string;
   issueNumber?: number;
   ownerRepo?: string;
