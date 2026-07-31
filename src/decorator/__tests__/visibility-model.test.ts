@@ -151,6 +151,95 @@ describe('table decoration rendering', () => {
     expect(cells[0].renderOptions?.before?.contentText).toBe(' bold ');
     expect(cells[0].renderOptions?.before?.fontWeight).toBe('bold');
   });
+
+  function renderCell(decoration: Partial<DecorationRange>) {
+    const text = '| a |\nother';
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      [{ startPos: 0, endPos: 1, type: 'tableCell', ...decoration } as any],
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    return (result.get('tableCell') as any[])[0].renderOptions.before;
+  }
+
+  it('sizes a cell as a fixed-width box in ch units', () => {
+    // Columns line up because the box has a fixed width, not because the
+    // replacement was padded to a character count - CJK glyphs are not an
+    // integer multiple of the ASCII advance in the fonts VS Code falls back to.
+    const before = renderCell({ replacement: '你好', cellWidth: 10, cellAlign: 'left' });
+    expect(before.width).toBe('10ch');
+    expect(before.contentText).toBe('你好');
+    expect(before.textDecoration).toContain('display: inline-block');
+    expect(before.textDecoration).toContain('box-sizing: border-box');
+    expect(before.textDecoration).toContain('padding: 0 1ch');
+    expect(before.textDecoration).toContain('text-align: left');
+  });
+
+  it('carries the column alignment into the box CSS', () => {
+    expect(renderCell({ replacement: 'c', cellWidth: 5, cellAlign: 'right' }).textDecoration)
+      .toContain('text-align: right');
+    expect(renderCell({ replacement: 'b', cellWidth: 5, cellAlign: 'center' }).textDecoration)
+      .toContain('text-align: center');
+  });
+
+  it('defaults to left alignment when none was resolved', () => {
+    expect(renderCell({ replacement: 'a', cellWidth: 5 }).textDecoration)
+      .toContain('text-align: left');
+  });
+
+  it('folds a whole-cell line-through into the box CSS', () => {
+    // Both the box CSS and the cell's text decoration travel on the same
+    // `textDecoration` field, so setting them separately would lose one.
+    const before = renderCell({
+      replacement: 'gone',
+      cellWidth: 8,
+      cellStyle: { textDecoration: 'line-through' },
+    });
+    expect(before.textDecoration).toContain('line-through');
+    expect(before.textDecoration).toContain('display: inline-block');
+  });
+
+  it('runs the separator rule edge to edge instead of insetting it', () => {
+    // Padding the separator would leave a gap after every vertical rule and
+    // push its trailing dashes over the next one.
+    const text = '|---|\nother';
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      [{
+        startPos: 0,
+        endPos: 1,
+        type: 'tableSeparatorDash',
+        replacement: '-----',
+        cellWidth: 5,
+      } as any],
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const before = (result.get('tableSeparatorDash') as any[])[0].renderOptions.before;
+    expect(before.width).toBe('5ch');
+    expect(before.textDecoration).toContain('padding: 0 0');
+    expect(before.textDecoration).not.toContain('padding: 0 1ch');
+  });
+
+  it('leaves pipes as plain replacements with no box', () => {
+    const text = '| a |\nother';
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      [{ startPos: 0, endPos: 1, type: 'tablePipe', replacement: '│' } as any],
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const before = (result.get('tablePipe') as any[])[0].renderOptions.before;
+    expect(before.width).toBeUndefined();
+    expect(before.textDecoration).toBeUndefined();
+  });
 });
 
 describe('selection overlay for codeBlock/frontmatter', () => {

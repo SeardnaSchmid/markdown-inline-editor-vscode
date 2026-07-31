@@ -10,6 +10,7 @@ import type {
 } from 'mdast';
 import type { ScopeRange } from './types';
 import { addScope } from './common';
+import { measureTextWidth } from './text-width';
 
 export function extractCellPlainText(cell: TableCell): string {
   const walk = (node: Node): string => {
@@ -69,26 +70,6 @@ export function detectCellStyle(
     return { fontWeight: 'normal' };
   }
   return undefined;
-}
-
-export function measureTextWidth(plain: string): number {
-  let width = 0;
-  let cjkCount = 0;
-  for (const char of plain) {
-    const code = char.codePointAt(0)!;
-    if (
-      (code >= 0x2e80 && code <= 0x9fff) ||
-      (code >= 0xf900 && code <= 0xfaff) ||
-      (code >= 0xfe30 && code <= 0xfe4f) ||
-      (code >= 0x20000 && code <= 0x2fa1f)
-    ) {
-      width += 2;
-      cjkCount++;
-    } else {
-      width += 1;
-    }
-  }
-  return width + Math.ceil(cjkCount * 0.25);
 }
 
 export function findPipePositions(
