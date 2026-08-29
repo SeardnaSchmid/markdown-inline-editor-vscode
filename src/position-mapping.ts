@@ -101,9 +101,10 @@ export function mapNormalizedToOriginal(normalizedPos: number, originalText?: st
  */
 export function normalizeAnchorText(text: string): string {
   return text
+    .trim()
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
-    .trim();
+    .replace(/^-+|-+$/g, '');
 }

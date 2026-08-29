@@ -6,7 +6,7 @@ async function navigateToAnchor(anchor: string, documentUri: string): Promise<vo
   const document = await vscode.workspace.openTextDocument(uri);
   const editor = await vscode.window.showTextDocument(document);
   const text = document.getText();
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
 
   for (let i = 0; i < lines.length; i++) {
     const headingMatch = lines[i].match(/^#+\s+(.+)$/);
