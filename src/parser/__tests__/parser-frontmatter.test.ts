@@ -149,6 +149,29 @@ title: Document
       expect(result.some(d => d.type === 'frontmatter')).toBe(false);
     });
 
+    // Note: The tests above verify that extra text on the CLOSING delimiter is correctly rejected.
+    // Symmetrically, the OPENING delimiter must also strictly reject extra text (e.g. `--- some text` or `---comment`).
+    // Per the YAML frontmatter standard (Jekyll, Hugo, GitHub), the opening delimiter line must contain only `---`.
+    it('should not treat invalid opening delimiter format as frontmatter', () => {
+      const markdown = `--- some text
+title: Document
+---`;
+      const result = parser.extractDecorations(markdown);
+
+      // Should not have frontmatter decoration (opening delimiter has extra text)
+      expect(result.some(d => d.type === 'frontmatter')).toBe(false);
+    });
+
+    it('should not treat ---comment as opening delimiter', () => {
+      const markdown = `---comment
+title: Document
+---`;
+      const result = parser.extractDecorations(markdown);
+
+      // Should not have frontmatter decoration (opening delimiter has text after ---)
+      expect(result.some(d => d.type === 'frontmatter')).toBe(false);
+    });
+
     it('should not apply decoration for incomplete frontmatter (no closing delimiter)', () => {
       const markdown = `---
 title: Document
