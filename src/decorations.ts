@@ -494,7 +494,9 @@ function createCheckboxBeforeOptions(resolvedColor: string | ThemeColor) {
     border: '1px solid',
     borderColor: resolvedColor,
     // Negative margin-right pulls the 'after' element inside the box border.
-    textDecoration: `display: inline-block; box-sizing: border-box; vertical-align: middle; margin-right: -${CHECKBOX_BOX_SIZE}; cursor: pointer;`,
+    // pointer-events: none allows mouse clicks on the box to pass through to the editor line
+    // so Monaco updates the cursor position and triggers handleCheckboxClick.
+    textDecoration: `display: inline-block; box-sizing: border-box; vertical-align: middle; margin-right: -${CHECKBOX_BOX_SIZE}; cursor: pointer; pointer-events: none;`,
   };
 }
 
@@ -512,6 +514,8 @@ export function CheckboxUncheckedDecorationType(color?: string | ThemeColor) {
 
   return window.createTextEditorDecorationType({
     textDecoration: 'none; display: none;',
+    // Sets pointer cursor on the decoration range while pseudo-elements allow click passthrough
+    cursor: 'pointer',
     before: createCheckboxBeforeOptions(resolvedColor),
     after: {
       contentText: ' ',
@@ -521,6 +525,7 @@ export function CheckboxUncheckedDecorationType(color?: string | ThemeColor) {
         position: relative;
         width: ${CHECKBOX_BOX_SIZE};
         cursor: pointer;
+        pointer-events: none;
         margin-right: ${CHECKBOX_GAP_SIZE};
         margin-left: ${CHECKBOX_PADDING};
       `
@@ -542,6 +547,8 @@ export function CheckboxCheckedDecorationType(color?: string | ThemeColor) {
 
   return window.createTextEditorDecorationType({
     textDecoration: 'none; display: none;',
+    // Sets pointer cursor on the decoration range while pseudo-elements allow click passthrough
+    cursor: 'pointer',
     before: createCheckboxBeforeOptions(resolvedColor),
     after: {
       contentText: '✔',
@@ -551,6 +558,7 @@ export function CheckboxCheckedDecorationType(color?: string | ThemeColor) {
         position: relative;
         width: ${CHECKBOX_BOX_SIZE};
         cursor: pointer;
+        pointer-events: none;
         margin-right: ${CHECKBOX_GAP_SIZE};
         margin-left: ${CHECKBOX_PADDING};
       `
