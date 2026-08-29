@@ -17,6 +17,11 @@ type FencedCodeBlock = {
 
 const MATH_FENCE_LANGUAGES = new Set(['math', 'latex', 'tex']);
 
+type IgnoredRange = {
+  startPos: number;
+  endPos: number;
+};
+
 /**
  * Scans text for math regions. Block math ($$...$$) is tried first; then inline ($...$).
  * Escaped \$ does not start/end; empty or whitespace-only content is not treated as math.
@@ -28,18 +33,28 @@ const MATH_FENCE_LANGUAGES = new Set(['math', 'latex', 'tex']);
  */
 export function scanMathRegions(text: string): MathRegion[] {
   const fencedBlocks = scanFencedCodeBlocks(text);
+  const inlineCodeSpans = scanInlineCodeSpans(text, fencedBlocks);
+
+  // All non-math code ranges where $ should be completely ignored:
+  // - Non-math fenced code blocks
+  // - Inline code spans
+  const ignoredRanges: IgnoredRange[] = [
+    ...fencedBlocks.filter((f) => !f.isMathFence).map((f) => ({ startPos: f.startPos, endPos: f.endPos })),
+    ...inlineCodeSpans,
+  ].sort((a, b) => a.startPos - b.startPos);
+
   const regions: MathRegion[] = [];
   let i = 0;
   const n = text.length;
-  let fenceIndex = 0;
+  let ignoredIndex = 0;
 
   while (i < n) {
-    while (fenceIndex < fencedBlocks.length && fencedBlocks[fenceIndex].endPos <= i) {
-      fenceIndex++;
+    while (ignoredIndex < ignoredRanges.length && ignoredRanges[ignoredIndex].endPos <= i) {
+      ignoredIndex++;
     }
-    const activeFence = fencedBlocks[fenceIndex];
-    if (activeFence && i >= activeFence.startPos && i < activeFence.endPos) {
-      i = activeFence.endPos;
+    const activeIgnored = ignoredRanges[ignoredIndex];
+    if (activeIgnored && i >= activeIgnored.startPos && i < activeIgnored.endPos) {
+      i = activeIgnored.endPos;
       continue;
     }
 
@@ -49,7 +64,7 @@ export function scanMathRegions(text: string): MathRegion[] {
         i++;
         continue;
       }
-      const block = tryMatchBlock(text, i);
+      const block = tryMatchBlock(text, i, ignoredRanges);
       if (block) {
         regions.push(block);
         i = block.endPos;
@@ -62,7 +77,7 @@ export function scanMathRegions(text: string): MathRegion[] {
 
     // Inline: single $ then find next unescaped $; content between is trimmed and must be non-empty
     if (text[i] === '$' && !isEscaped(text, i)) {
-      const inline = tryMatchInline(text, i);
+      const inline = tryMatchInline(text, i, ignoredRanges);
       if (inline) {
         regions.push(inline);
         i = inline.endPos;
@@ -108,13 +123,17 @@ function isEscaped(text: string, dollarIndex: number): boolean {
   return backslashes % 2 === 1;
 }
 
-function tryMatchBlock(text: string, start: number): MathRegion | null {
+function tryMatchBlock(text: string, start: number, ignoredRanges: IgnoredRange[]): MathRegion | null {
   if (start + 4 > text.length) return null;
   if (text[start] !== '$' || text[start + 1] !== '$') return null;
   let i = start + 2;
   while (i < text.length) {
     const idx = text.indexOf('$$', i);
     if (idx === -1) return null;
+    if (ignoredRanges.some((r) => idx >= r.startPos && idx < r.endPos)) {
+      i = idx + 2;
+      continue;
+    }
     if (isEscapedAt(text, idx)) {
       i = idx + 1;
       continue;
@@ -145,12 +164,30 @@ function isEscapedAt(text: string, idx: number): boolean {
   return backslashes % 2 === 1;
 }
 
-function tryMatchInline(text: string, start: number): MathRegion | null {
+function tryMatchInline(text: string, start: number, ignoredRanges: IgnoredRange[]): MathRegion | null {
   if (text[start] !== '$') return null;
   let i = start + 1;
   while (i < text.length) {
     const idx = text.indexOf('$', i);
     if (idx === -1) return null;
+
+    // Inline math cannot cross blank lines (paragraph breaks)
+    const between = text.slice(start, idx);
+    if (/\n[ \t]*\r?\n/.test(between)) {
+      return null;
+    }
+
+    // Abort if an ignored code span starts between start and idx
+    if (ignoredRanges.some((r) => r.startPos > start && r.startPos < idx)) {
+      return null;
+    }
+
+    // Skip if closing delimiter falls inside an ignored code span
+    if (ignoredRanges.some((r) => idx >= r.startPos && idx < r.endPos)) {
+      i = idx + 1;
+      continue;
+    }
+
     if (isEscapedAt(text, idx)) {
       i = idx + 1;
       continue;
@@ -168,6 +205,70 @@ function tryMatchInline(text: string, start: number): MathRegion | null {
     };
   }
   return null;
+}
+
+/**
+ * Scans document text for inline code spans (`...` or ``...``) outside fenced code blocks.
+ * Matches exact backtick sequence lengths according to CommonMark spec.
+ * Used to ensure $ characters inside inline code (e.g. regex anchors, shell variables)
+ * are never erroneously parsed as math delimiters.
+ */
+function scanInlineCodeSpans(text: string, fencedBlocks: FencedCodeBlock[]): IgnoredRange[] {
+  const spans: IgnoredRange[] = [];
+  let i = 0;
+  let fenceIdx = 0;
+  const n = text.length;
+
+  while (i < n) {
+    while (fenceIdx < fencedBlocks.length && fencedBlocks[fenceIdx].endPos <= i) {
+      fenceIdx++;
+    }
+    const currentFence = fencedBlocks[fenceIdx];
+    if (currentFence && i >= currentFence.startPos && i < currentFence.endPos) {
+      i = currentFence.endPos;
+      continue;
+    }
+
+    if (text[i] === '`') {
+      // Measure opening delimiter run length (e.g. ` or ``)
+      let backtickLen = 1;
+      while (i + backtickLen < n && text[i + backtickLen] === '`') {
+        backtickLen++;
+      }
+      const closeMarker = '`'.repeat(backtickLen);
+      let searchPos = i + backtickLen;
+      let closePos = -1;
+
+      // Find matching closing backtick run of the exact same length per CommonMark
+      while (searchPos < n) {
+        if (fenceIdx < fencedBlocks.length && searchPos >= fencedBlocks[fenceIdx].startPos) {
+          break;
+        }
+        const found = text.indexOf(closeMarker, searchPos);
+        if (found === -1) break;
+        let count = backtickLen;
+        while (found + count < n && text[found + count] === '`') {
+          count++;
+        }
+        if (count === backtickLen) {
+          closePos = found;
+          break;
+        }
+        searchPos = found + count;
+      }
+
+      if (closePos !== -1) {
+        const spanEnd = closePos + backtickLen;
+        spans.push({ startPos: i, endPos: spanEnd });
+        i = spanEnd;
+        continue;
+      }
+      i += backtickLen;
+      continue;
+    }
+    i++;
+  }
+  return spans;
 }
 
 function scanFencedCodeBlocks(text: string): FencedCodeBlock[] {
