@@ -516,6 +516,11 @@ export function CheckboxUncheckedDecorationType(color?: string | ThemeColor) {
     after: {
       contentText: ' ',
       color: resolvedColor,
+      // The `after` content overlaps the box interior; without `pointer-events: none`,
+      // Monaco's caretRangeFromPoint resolves clicks there to pseudo-content, no
+      // selection-change event fires, and checkbox-toggle.ts never runs.
+      // Let those clicks fall through to the `before` box (which maps to the end of
+      // the hidden `[ ]` range, a valid caret position inside the toggle range).
       textDecoration: `
         display: inline-block;
         position: relative;
@@ -523,6 +528,7 @@ export function CheckboxUncheckedDecorationType(color?: string | ThemeColor) {
         cursor: pointer;
         margin-right: ${CHECKBOX_GAP_SIZE};
         margin-left: ${CHECKBOX_PADDING};
+        pointer-events: none;
       `
     }
   });
@@ -546,6 +552,11 @@ export function CheckboxCheckedDecorationType(color?: string | ThemeColor) {
     after: {
       contentText: '✔',
       color: resolvedColor,
+      // The `after` content overlaps the box interior; without `pointer-events: none`,
+      // Monaco's caretRangeFromPoint resolves clicks there to pseudo-content, no
+      // selection-change event fires, and checkbox-toggle.ts never runs.
+      // Let those clicks fall through to the `before` box (which maps to the end of
+      // the hidden `[ ]` range, a valid caret position inside the toggle range).
       textDecoration: `
         display: inline-block;
         position: relative;
@@ -553,6 +564,7 @@ export function CheckboxCheckedDecorationType(color?: string | ThemeColor) {
         cursor: pointer;
         margin-right: ${CHECKBOX_GAP_SIZE};
         margin-left: ${CHECKBOX_PADDING};
+        pointer-events: none;
       `
     }
   });
