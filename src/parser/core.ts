@@ -1438,14 +1438,15 @@ export class MarkdownParser {
 
         const rawContent = text.substring(cellRangeStart, cellRangeEnd);
         const trimmedContent = rawContent.trim();
-        const cellStyle = this.detectCellStyle(trimmedContent);
         const colWidth = i < colWidths.length ? colWidths[i] : 3;
 
         // Whole-cell styled: extract clean text via AST + apply CSS
         // Mixed formatting: show raw syntax (VS Code can't partially style)
         // Plain / escaped: use AST extraction (handles \| → |, \\ → \)
         const astCell = i < row.children.length ? row.children[i] as TableCell : undefined;
-        const showRaw = !cellStyle && astCell && this.cellHasMixedFormatting(astCell);
+        const isMixed = astCell ? this.cellHasMixedFormatting(astCell) : false;
+        const cellStyle = isMixed ? undefined : this.detectCellStyle(trimmedContent);
+        const showRaw = isMixed;
         const displayContent = (astCell && !showRaw)
           ? this.extractCellPlainText(astCell)
           : trimmedContent;

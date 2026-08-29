@@ -34,39 +34,67 @@ export function extractCellPlainText(cell: TableCell): string {
   return cell.children.map(walk).join('');
 }
 
+/**
+ * Determines whether a table cell contains mixed or partial formatting.
+ * Cells with mixed formatting cannot be styled with a single whole-cell CSS style
+ * and fall back to raw Markdown syntax to preserve visual formatting accuracy.
+ */
 export function cellHasMixedFormatting(cell: TableCell): boolean {
-  return cell.children.some((child) =>
-    child.type === 'strong' || child.type === 'emphasis' ||
-    child.type === 'delete' || child.type === 'inlineCode'
-  );
+  if (cell.children.length > 1) {
+    return cell.children.some((child) =>
+      child.type === 'strong' || child.type === 'emphasis' ||
+      child.type === 'delete' || child.type === 'inlineCode'
+    );
+  }
+  if (cell.children.length === 1) {
+    const child = cell.children[0];
+    if (child.type === 'inlineCode') {
+      return true;
+    }
+    // Check if the single formatted child has nested mixed formatting (e.g., **Bold and _italic_**)
+    if ('children' in child && Array.isArray((child as any).children)) {
+      const grandChildren = (child as any).children;
+      if (grandChildren.length > 1) {
+        return grandChildren.some((gc: any) =>
+          gc.type === 'strong' || gc.type === 'emphasis' ||
+          gc.type === 'delete' || gc.type === 'inlineCode'
+        );
+      }
+    }
+  }
+  return false;
 }
 
+/**
+ * Detects uniform whole-cell text styling from trimmed cell text.
+ * Enforces CommonMark flanking rules to prevent invalid whitespace from matching,
+ * and ensures nested or intermediate delimiter runs are not falsely treated as whole-cell styles.
+ */
 export function detectCellStyle(
   trimmed: string,
 ): { fontWeight?: string; fontStyle?: string; textDecoration?: string } | undefined {
   if (
-    (trimmed.startsWith('***') && trimmed.endsWith('***')) ||
-    (trimmed.startsWith('___') && trimmed.endsWith('___'))
+    (trimmed.startsWith('***') && trimmed.endsWith('***') && trimmed.length >= 8 && !trimmed.startsWith('*** ') && !trimmed.endsWith(' ***') && !trimmed.slice(3, -3).includes('***')) ||
+    (trimmed.startsWith('___') && trimmed.endsWith('___') && trimmed.length >= 8 && !trimmed.startsWith('___ ') && !trimmed.endsWith(' ___') && !trimmed.slice(3, -3).includes('___')) ||
+    (trimmed.startsWith('**_') && trimmed.endsWith('_**') && trimmed.length >= 8 && !trimmed.startsWith('**_ ') && !trimmed.endsWith(' _**')) ||
+    (trimmed.startsWith('_**') && trimmed.endsWith('**_') && trimmed.length >= 8 && !trimmed.startsWith('_** ') && !trimmed.endsWith(' **_'))
   ) {
     return { fontWeight: 'bold', fontStyle: 'italic' };
   }
   if (
-    (trimmed.startsWith('**') && trimmed.endsWith('**')) ||
-    (trimmed.startsWith('__') && trimmed.endsWith('__'))
+    (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length >= 6 && !trimmed.startsWith('** ') && !trimmed.endsWith(' **') && !trimmed.slice(2, -2).includes('**') && !trimmed.slice(2, -2).includes('_') && !trimmed.slice(2, -2).includes('`') && !trimmed.slice(2, -2).includes('~~')) ||
+    (trimmed.startsWith('__') && trimmed.endsWith('__') && trimmed.length >= 6 && !trimmed.startsWith('__ ') && !trimmed.endsWith(' __') && !trimmed.slice(2, -2).includes('__') && !trimmed.slice(2, -2).includes('*') && !trimmed.slice(2, -2).includes('`') && !trimmed.slice(2, -2).includes('~~'))
   ) {
     return { fontWeight: 'bold' };
   }
-  if (trimmed.startsWith('~~') && trimmed.endsWith('~~')) {
+  if (trimmed.startsWith('~~') && trimmed.endsWith('~~') && trimmed.length >= 6 && !trimmed.startsWith('~~ ') && !trimmed.endsWith(' ~~') && !trimmed.slice(2, -2).includes('~~')) {
     return { textDecoration: 'line-through' };
   }
   if (
-    (trimmed.startsWith('*') && trimmed.endsWith('*') && trimmed.length > 2) ||
-    (trimmed.startsWith('_') && trimmed.endsWith('_') && trimmed.length > 2)
+    (trimmed.startsWith('*') && trimmed.endsWith('*') && trimmed.length > 2 && !trimmed.startsWith('* ') && !trimmed.endsWith(' *') && !trimmed.slice(1, -1).includes('*') && !trimmed.slice(1, -1).includes('`') && !trimmed.slice(1, -1).includes('~~')) ||
+    (trimmed.startsWith('_') && trimmed.endsWith('_') && trimmed.length > 2 && !trimmed.startsWith('_ ') && !trimmed.endsWith(' _') && !trimmed.slice(1, -1).includes('_') && !trimmed.slice(1, -1).includes('`') && !trimmed.slice(1, -1).includes('~~'))
   ) {
     return { fontStyle: 'italic' };
-  }
-  if (trimmed.startsWith('`') && trimmed.endsWith('`') && trimmed.length > 2) {
-    return { fontWeight: 'normal' };
   }
   return undefined;
 }
