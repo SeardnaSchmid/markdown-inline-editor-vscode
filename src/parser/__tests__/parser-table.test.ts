@@ -237,5 +237,69 @@ describe('MarkdownParser - Tables', () => {
       // Should NOT have cellStyle since it's mixed
       expect(mixedCell!.cellStyle).toBeUndefined();
     });
+
+    it('should show raw syntax when cell starts and ends with formatting delimiters but contains mixed content', () => {
+      const md = '| Col |\n|---|\n| **A** and **B** |\n| *A* and *B* |\n| `A` and `B` |\n| ~~A~~ and ~~B~~ |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+
+      const boldCell = cells.find((c) => c.replacement!.includes('**A**'));
+      expect(boldCell).toBeDefined();
+      expect(boldCell!.replacement).toContain('**');
+      expect(boldCell!.cellStyle).toBeUndefined();
+
+      const italicCell = cells.find((c) => c.replacement!.includes('*A*'));
+      expect(italicCell).toBeDefined();
+      expect(italicCell!.replacement).toContain('*');
+      expect(italicCell!.cellStyle).toBeUndefined();
+
+      const codeCell = cells.find((c) => c.replacement!.includes('`A`'));
+      expect(codeCell).toBeDefined();
+      expect(codeCell!.replacement).toContain('`');
+      expect(codeCell!.cellStyle).toBeUndefined();
+
+      const strikeCell = cells.find((c) => c.replacement!.includes('~~A~~'));
+      expect(strikeCell).toBeDefined();
+      expect(strikeCell!.replacement).toContain('~~');
+      expect(strikeCell!.cellStyle).toBeUndefined();
+    });
+
+    it('should not treat delimiter runs with inner whitespace as formatted cells', () => {
+      const md = '| Col |\n|---|\n| ** Not valid ** |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const cell = cells.find((c) => c.replacement!.includes('Not valid'));
+      expect(cell).toBeDefined();
+      expect(cell!.cellStyle).toBeUndefined();
+    });
+
+    it('should preserve backticks for inline code cells', () => {
+      const md = '| Col |\n|---|\n| `code only` |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const cell = cells.find((c) => c.replacement!.includes('code only'));
+      expect(cell).toBeDefined();
+      expect(cell!.replacement).toContain('`code only`');
+      expect(cell!.cellStyle).toBeUndefined();
+    });
+
+    it('should show raw syntax for nested partial formatting within bold or italic', () => {
+      const md = '| Col |\n|---|\n| **Bold and _italic_ inside** |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const cell = cells.find((c) => c.replacement!.includes('italic'));
+      expect(cell).toBeDefined();
+      expect(cell!.replacement).toContain('**');
+      expect(cell!.replacement).toContain('_');
+      expect(cell!.cellStyle).toBeUndefined();
+    });
+
+    it('should style whole-cell bold and italic when fully wrapped with combined delimiters', () => {
+      const md = '| Col |\n|---|\n| ***Bold and Italic*** |\n| **_Bold and Italic_** |';
+      const result = parser.extractDecorations(md);
+      const cells = byType(result, 'tableCell');
+      const cellsWithBoldItalic = cells.filter((c) => c.cellStyle?.fontWeight === 'bold' && c.cellStyle?.fontStyle === 'italic');
+      expect(cellsWithBoldItalic.length).toBe(2);
+    });
   });
 });
