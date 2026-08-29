@@ -207,6 +207,12 @@ function tryMatchInline(text: string, start: number, ignoredRanges: IgnoredRange
   return null;
 }
 
+/**
+ * Scans document text for inline code spans (`...` or ``...``) outside fenced code blocks.
+ * Matches exact backtick sequence lengths according to CommonMark spec.
+ * Used to ensure $ characters inside inline code (e.g. regex anchors, shell variables)
+ * are never erroneously parsed as math delimiters.
+ */
 function scanInlineCodeSpans(text: string, fencedBlocks: FencedCodeBlock[]): IgnoredRange[] {
   const spans: IgnoredRange[] = [];
   let i = 0;
@@ -224,6 +230,7 @@ function scanInlineCodeSpans(text: string, fencedBlocks: FencedCodeBlock[]): Ign
     }
 
     if (text[i] === '`') {
+      // Measure opening delimiter run length (e.g. ` or ``)
       let backtickLen = 1;
       while (i + backtickLen < n && text[i + backtickLen] === '`') {
         backtickLen++;
@@ -232,6 +239,7 @@ function scanInlineCodeSpans(text: string, fencedBlocks: FencedCodeBlock[]): Ign
       let searchPos = i + backtickLen;
       let closePos = -1;
 
+      // Find matching closing backtick run of the exact same length per CommonMark
       while (searchPos < n) {
         if (fenceIdx < fencedBlocks.length && searchPos >= fencedBlocks[fenceIdx].startPos) {
           break;
