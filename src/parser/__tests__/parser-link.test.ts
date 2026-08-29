@@ -440,5 +440,35 @@ describe('MarkdownParser - Links', () => {
       expect(linkDecs.length).toBe(0);
     });
   });
+
+  describe('link with parentheses in URL', () => {
+    it('should hide entire URL and closing parenthesis when URL contains parentheses', () => {
+      const markdown = '[Wikipedia](https://en.wikipedia.org/wiki/Function_(mathematics))';
+      const result = parser.extractDecorations(markdown);
+      
+      const linkDec = result.find(d => d.type === 'link');
+      expect(linkDec).toBeDefined();
+      expect(linkDec?.url).toBe('https://en.wikipedia.org/wiki/Function_(mathematics)');
+      expect(linkDec?.startPos).toBe(1);
+      expect(linkDec?.endPos).toBe(10); // 'Wikipedia'
+
+      // The entire URL content should be hidden
+      expect(result.some(d => d.type === 'hide' && d.startPos === 12 && d.endPos === 64)).toBe(true);
+      // The closing parenthesis of the link (last char) must be hidden
+      expect(result.some(d => d.type === 'hide' && d.startPos === 64 && d.endPos === 65)).toBe(true);
+    });
+
+    it('should hide entire URL when URL has nested parentheses and trailing path', () => {
+      const markdown = '[Release Notes](https://example.com/item_(v2)_final)';
+      const result = parser.extractDecorations(markdown);
+
+      // The closing parenthesis of the link must be hidden
+      expect(
+        result.some(
+          d => d.type === 'hide' && d.startPos === markdown.length - 1 && d.endPos === markdown.length
+        )
+      ).toBe(true);
+    });
+  });
 });
 
