@@ -62,20 +62,26 @@ describe("link-targets", () => {
       expect(result?.uri.toString()).toContain("relative.md");
     });
 
-    it("resolves relative paths with heading anchors without including anchor in file path", () => {
+    it("creates command targets for relative paths with heading anchors", () => {
       const result = resolveLinkTarget("./foo.md#test", documentUri as any);
-      expect(result?.kind).toBe("uri");
-      expect(result?.uri.path).toContain("foo.md");
-      expect(result?.uri.path).not.toContain("#test");
-      expect((result?.uri as any).fragment).toBe("test");
+      expect(result?.kind).toBe("command");
+      if (result?.kind === "command") {
+        expect(result.command).toBe("markdown-inline-editor.navigateToAnchor");
+        expect(result.args[0]).toBe("test");
+        expect(result.args[1]).toContain("foo.md");
+        expect(result.args[1]).not.toContain("#test");
+      }
     });
 
-    it("resolves absolute file paths with heading anchors", () => {
+    it("creates command targets for absolute file paths with heading anchors", () => {
       const result = resolveLinkTarget("/absolute/path/file.md#section", documentUri as any);
-      expect(result?.kind).toBe("uri");
-      expect(result?.uri.path).toContain("/absolute/path/file.md");
-      expect(result?.uri.path).not.toContain("#section");
-      expect((result?.uri as any).fragment).toBe("section");
+      expect(result?.kind).toBe("command");
+      if (result?.kind === "command") {
+        expect(result.command).toBe("markdown-inline-editor.navigateToAnchor");
+        expect(result.args[0]).toBe("section");
+        expect(result.args[1]).toContain("/absolute/path/file.md");
+        expect(result.args[1]).not.toContain("#section");
+      }
     });
   });
 

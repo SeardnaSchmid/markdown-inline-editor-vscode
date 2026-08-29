@@ -94,9 +94,17 @@ export function resolveLinkTarget(
     ? vscode.Uri.file(targetPath)
     : vscode.Uri.joinPath(documentUri, "..", targetPath);
 
+  if (fragment) {
+    return {
+      kind: "command",
+      command: "markdown-inline-editor.navigateToAnchor",
+      args: [fragment, baseUri.toString()],
+    };
+  }
+
   return {
     kind: "uri",
-    uri: fragment !== undefined ? baseUri.with({ fragment }) : baseUri,
+    uri: baseUri,
   };
 }
 
