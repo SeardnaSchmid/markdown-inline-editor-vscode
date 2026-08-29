@@ -178,6 +178,24 @@ describe('decoration creation with color (hex vs theme)', () => {
       const after = opts.after as Record<string, unknown>;
       expect(after.textDecoration).toContain('cursor: pointer');
     });
+
+    it('CheckboxCheckedDecorationType after block includes pointer-events: none in textDecoration', () => {
+      resetTextEditorDecorationTypeOptionsCapture();
+      CheckboxCheckedDecorationType();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      const after = opts.after as Record<string, unknown>;
+      // Lets clicks over the box interior fall through to the `before` box so
+      // handleCheckboxClick receives a selection-change event (see decorations.ts).
+      expect(after.textDecoration).toContain('pointer-events: none');
+    });
+
+    it('CheckboxUncheckedDecorationType after block includes pointer-events: none in textDecoration', () => {
+      resetTextEditorDecorationTypeOptionsCapture();
+      CheckboxUncheckedDecorationType();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      const after = opts.after as Record<string, unknown>;
+      expect(after.textDecoration).toContain('pointer-events: none');
+    });
   });
 
   describe('CodeDecorationType backgroundColor parameter', () => {
