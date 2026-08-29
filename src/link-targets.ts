@@ -30,7 +30,19 @@ export function resolveImageTarget(
     }
   }
 
-  return vscode.Uri.joinPath(documentUri, "..", trimmed);
+  let targetPath = trimmed;
+  let fragment: string | undefined;
+  const hashIdx = trimmed.indexOf("#");
+  if (hashIdx !== -1) {
+    targetPath = trimmed.substring(0, hashIdx);
+    fragment = trimmed.substring(hashIdx + 1);
+  }
+
+  const baseUri = targetPath.startsWith("/")
+    ? vscode.Uri.file(targetPath)
+    : vscode.Uri.joinPath(documentUri, "..", targetPath);
+
+  return fragment !== undefined ? baseUri.with({ fragment }) : baseUri;
 }
 
 export function resolveLinkTarget(
@@ -67,11 +79,33 @@ export function resolveLinkTarget(
     }
   }
 
-  if (trimmed.startsWith("/")) {
-    return { kind: "uri", uri: vscode.Uri.file(trimmed) };
+  // Split optional fragment/anchor (#heading) from the file path so that
+  // links like "./foo.md#test" navigate to the file and anchor instead of
+  // treating "#test" as part of the file name.
+  let targetPath = trimmed;
+  let fragment: string | undefined;
+  const hashIdx = trimmed.indexOf("#");
+  if (hashIdx !== -1) {
+    targetPath = trimmed.substring(0, hashIdx);
+    fragment = trimmed.substring(hashIdx + 1);
   }
 
-  return { kind: "uri", uri: vscode.Uri.joinPath(documentUri, "..", trimmed) };
+  const baseUri = targetPath.startsWith("/")
+    ? vscode.Uri.file(targetPath)
+    : vscode.Uri.joinPath(documentUri, "..", targetPath);
+
+  if (fragment) {
+    return {
+      kind: "command",
+      command: "markdown-inline-editor.navigateToAnchor",
+      args: [fragment, baseUri.toString()],
+    };
+  }
+
+  return {
+    kind: "uri",
+    uri: baseUri,
+  };
 }
 
 export function toCommandUri(command: string, args: unknown[]): vscode.Uri {
