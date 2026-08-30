@@ -136,6 +136,12 @@
           "description": "Render LaTeX math inline ($...$ and $$...$$)",
           "markdownDescription": "Render LaTeX math inline ($...$ and $$...$$). When disabled, math delimiters are shown as plain text."
         },
+        "markdownInlineEditor.highlight.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render highlighted text (==text==)",
+          "markdownDescription": "Render highlighted text (==text==) inline in Markdown documents. When disabled, == delimiters are shown as plain text."
+        },
         "markdownInlineEditor.orderedLists.autoNumber": {
           "type": "boolean",
           "default": true,
@@ -260,6 +266,18 @@
           "description": "Hex color for checkbox (unchecked and checked)",
           "format": "color",
           "markdownDescription": "Hex color for unchecked and checked checkbox symbols. Leave empty to use theme default."
+        },
+        "markdownInlineEditor.colors.highlight": {
+          "type": "string",
+          "description": "Hex color for highlighted text",
+          "format": "color",
+          "markdownDescription": "Hex color for highlighted text. Leave empty to use theme default."
+        },
+        "markdownInlineEditor.colors.highlightBackground": {
+          "type": "string",
+          "description": "Hex color for highlight background",
+          "format": "color",
+          "markdownDescription": "Hex color for highlight background overlay. Leave empty to use theme default (semi-transparent yellow)."
         }
       }
     }
