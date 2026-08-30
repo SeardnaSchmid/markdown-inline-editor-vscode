@@ -100,6 +100,8 @@ export class Decorator {
       getImageColor: () => config.colors.image(),
       getHorizontalRuleColor: () => config.colors.horizontalRule(),
       getCheckboxColor: () => config.colors.checkbox(),
+      getHighlightColor: () => config.colors.highlight(),
+      getHighlightBackgroundColor: () => config.colors.highlightBackground(),
     });
   }
 

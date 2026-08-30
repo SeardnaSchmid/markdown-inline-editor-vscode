@@ -55,6 +55,7 @@ export type DecorationType =
   | "italic"
   | "boldItalic"
   | "strikethrough"
+  | "highlight"
   | "code"
   | "codeBlock"
   | "codeBlockLanguage"

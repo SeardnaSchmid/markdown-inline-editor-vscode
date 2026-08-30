@@ -148,6 +148,44 @@ export function StrikethroughDecorationType() {
 }
 
 /**
+ * Creates a decoration type for highlighted text styling (==text==).
+ *
+ * Uses a theme-aware semi-transparent yellow background:
+ * - Dark themes: rgba(255, 214, 0, 0.28) for high contrast and clear white text readability
+ * - Light themes: rgba(255, 235, 59, 0.40) for classic highlighter aesthetic
+ *
+ * @param {string | ThemeColor | undefined} color - Optional hex or theme color for text
+ * @param {string | ThemeColor | undefined} backgroundColor - Optional hex or theme color for background overlay
+ * @returns {vscode.TextEditorDecorationType} A decoration type for highlighted text
+ */
+export function HighlightDecorationType(
+  color?: string | ThemeColor,
+  backgroundColor?: string | ThemeColor,
+) {
+  const isDark = isDarkTheme();
+  let bgColor: string | ThemeColor;
+  if (backgroundColor !== undefined) {
+    bgColor = backgroundColor;
+  } else {
+    bgColor = isDark
+      ? 'rgba(255, 214, 0, 0.28)'
+      : 'rgba(255, 235, 59, 0.40)';
+  }
+  const options: Record<string, unknown> = {};
+  if (typeof bgColor === 'string') {
+    // Apply background directly to text span to retain styling when delimiters are hidden
+    options.textDecoration = `none; background-color: ${bgColor}; border-radius: 3px;`;
+  } else {
+    options.backgroundColor = bgColor;
+    options.borderRadius = '3px';
+  }
+  if (color !== undefined) {
+    options.color = color;
+  }
+  return window.createTextEditorDecorationType(options);
+}
+
+/**
  * Creates a decoration type for inline code styling.
  *
  * Uses the editor background color with theme-aware brightness adjustment:
