@@ -648,3 +648,22 @@ export function MermaidHoverIndicatorDecorationType() {
     opacity: '0.2', // Apply opacity to the entire decoration
   });
 }
+
+/**
+ * Creates a decoration type that collapses the source of a rendered mermaid block.
+ *
+ * The parser only hides the fence lines, so the diagram source itself is hidden
+ * here: zero-width and transparent, which keeps the block's line count (and with
+ * it the vertical space the diagram is drawn into) while showing nothing.
+ *
+ * Kept separate from the diagram image so the image can be re-anchored to a
+ * different line as the block scrolls without disturbing the hidden source.
+ *
+ * @returns {vscode.TextEditorDecorationType} A decoration type hiding mermaid source
+ */
+export function MermaidSourceDecorationType() {
+  return window.createTextEditorDecorationType({
+    color: 'transparent',
+    textDecoration: 'none; display: inline-block; width: 0;',
+  });
+}

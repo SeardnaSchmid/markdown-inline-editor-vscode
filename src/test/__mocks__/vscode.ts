@@ -180,6 +180,7 @@ class MockTextEditor {
   constructor(
     public document: MockTextDocument,
     public selections: MockSelection[],
+    public visibleRanges: MockRange[] = [],
   ) {
     this.selection = selections[0] ?? new MockSelection({ line: 0, character: 0 }, { line: 0, character: 0 });
   }
@@ -233,6 +234,7 @@ export const window = {
   showTextDocument: vi.fn(async (document: MockTextDocument) => new MockTextEditor(document, [])),
   onDidChangeActiveTextEditor: () => ({ dispose: () => {} }),
   onDidChangeTextEditorSelection: () => ({ dispose: () => {} }),
+  onDidChangeTextEditorVisibleRanges: () => ({ dispose: () => {} }),
   onDidChangeActiveColorTheme: () => ({ dispose: () => {} }),
 };
 
