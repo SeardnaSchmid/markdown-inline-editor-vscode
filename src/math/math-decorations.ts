@@ -1,5 +1,6 @@
 import { type TextEditor, window, Uri, type Range, ColorThemeKind, workspace } from 'vscode';
 import type { MathRegion } from '../parser';
+import { getEditorLineHeight } from '../editor-metrics';
 import { renderMathToDataUri } from './math-renderer';
 
 /** Default editor foreground colors by theme (VS Code defaults). */
@@ -10,21 +11,8 @@ const DEFAULT_FOREGROUND = {
 
 /** Compute line height from editor settings, aligned with mermaid sizing fallback. */
 function getEditorHeights(): { blockHeight: number; inlineHeight: number; lineHeight: number } {
-  const editorConfig = workspace.getConfiguration('editor');
-  const fontSize = editorConfig.get<number>('fontSize', 14);
-  const lineHeightSetting = editorConfig.get<number>('lineHeight', 0);
-  let lineHeight: number;
-  if (lineHeightSetting === 0 || lineHeightSetting < 8) {
-    const multiplier = process.platform === 'darwin' ? 1.5 : 1.35;
-    lineHeight = Math.round(fontSize * multiplier);
-    if (lineHeight < 8) {
-      lineHeight = 8;
-    }
-  } else if (lineHeightSetting >= 10) {
-    lineHeight = Math.round(lineHeightSetting);
-  } else {
-    lineHeight = Math.round(fontSize * lineHeightSetting);
-  }
+  const fontSize = workspace.getConfiguration('editor').get<number>('fontSize', 14);
+  const lineHeight = getEditorLineHeight();
   const inlineHeight = Math.round(fontSize * 1.2);
   return { blockHeight: lineHeight, inlineHeight, lineHeight };
 }

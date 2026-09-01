@@ -1,4 +1,5 @@
 import { type TextEditor, window, Uri, type TextEditorDecorationType, type Range, ColorThemeKind } from 'vscode';
+import { getEditorLineHeight } from '../editor-metrics';
 
 type MermaidDecorationEntry = {
   decorationType: TextEditorDecorationType;
@@ -12,7 +13,19 @@ export class MermaidDiagramDecorations {
 
   constructor(private maxEntries: number = 50) {}
 
-  apply(editor: TextEditor, rangesByKey: Map<string, Range[]>, dataUrisByKey: Map<string, string>): void {
+  /**
+   * Applies diagram decorations, one decoration type per rendered SVG.
+   *
+   * @param lineOffsetsByKey - Lines each diagram was re-anchored down by, pulled
+   *   back up with a negative margin so the diagram keeps its place while the
+   *   top of its block is scrolled out of view. Absent means no offset.
+   */
+  apply(
+    editor: TextEditor,
+    rangesByKey: Map<string, Range[]>,
+    dataUrisByKey: Map<string, string>,
+    lineOffsetsByKey?: Map<string, number>
+  ): void {
     const usedKeys = new Set<string>();
     const isDarkTheme = window.activeColorTheme.kind === ColorThemeKind.Dark ||
       window.activeColorTheme.kind === ColorThemeKind.HighContrast;
@@ -22,7 +35,7 @@ export class MermaidDiagramDecorations {
       if (!dataUri || ranges.length === 0) {
         continue;
       }
-      const entry = this.getOrCreateEntry(key, dataUri, isDarkTheme);
+      const entry = this.getOrCreateEntry(key, dataUri, isDarkTheme, lineOffsetsByKey?.get(key) ?? 0);
       usedKeys.add(key);
       editor.setDecorations(entry.decorationType, ranges);
     }
@@ -38,7 +51,12 @@ export class MermaidDiagramDecorations {
     this.cache.clear();
   }
 
-  private getOrCreateEntry(key: string, dataUri: string, isDarkTheme: boolean): MermaidDecorationEntry {
+  private getOrCreateEntry(
+    key: string,
+    dataUri: string,
+    isDarkTheme: boolean,
+    lineOffset: number
+  ): MermaidDecorationEntry {
     const existing = this.cache.get(key);
     // Invalidate cache if theme changed
     if (existing && existing.isDarkTheme === isDarkTheme) {
@@ -52,14 +70,23 @@ export class MermaidDiagramDecorations {
       this.cache.delete(key);
     }
 
-    // Mermaid themes handle colors internally, so we don't need to invert
-    // Match Markless pattern exactly: transparent text, SVG in before pseudo-element
+    // Re-anchored diagrams hang off a lower line, so shift them back up by the
+    // rows they skipped. The overflow is clipped by the viewport, which is
+    // exactly the part that scrolled away.
+    // The attachment renders as an inline pseudo-element, and vertical margins
+    // do not apply to inline boxes, so it has to become inline-block for the
+    // shift to take effect at all.
+    const shiftUp = lineOffset > 0
+      ? `margin-top: -${lineOffset * getEditorLineHeight()}px;`
+      : '';
+
+    // Mermaid themes handle colors internally, so we don't need to invert.
+    // Only the image lives here; the block's source is collapsed separately by
+    // MermaidSourceDecorationType.
     const decorationType = window.createTextEditorDecorationType({
-      color: 'transparent',
-      textDecoration: 'none; display: inline-block; width: 0;',
       before: {
         contentIconPath: Uri.parse(dataUri),
-        textDecoration: 'none;',
+        textDecoration: `none; display: inline-block; vertical-align: top; ${shiftUp}`,
       },
     });
 

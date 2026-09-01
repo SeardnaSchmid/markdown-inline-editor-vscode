@@ -19,6 +19,7 @@ describe('registerEventHandlers', () => {
       recreateCodeBlockLanguageDecorationType: vi.fn(),
       recreateColorDependentTypes: vi.fn(),
       clearMathDecorationCache: vi.fn(),
+      updateMermaidForVisibleRanges: vi.fn(),
     };
     const linkClickHandler = {
       setEnabled: vi.fn(),
@@ -26,13 +27,16 @@ describe('registerEventHandlers', () => {
 
     const disposables = registerEventHandlers(decorator as any, linkClickHandler as any);
 
-    expect(disposables).toHaveLength(6);
+    expect(disposables).toHaveLength(7);
   });
 
   it('routes editor and workspace events to the decorator', () => {
     let activeEditorListener: ((editor: vscode.TextEditor | undefined) => void) | undefined;
     let selectionListener:
       | ((event: { kind: vscode.TextEditorSelectionChangeKind }) => void)
+      | undefined;
+    let visibleRangesListener:
+      | ((event: { textEditor: vscode.TextEditor }) => void)
       | undefined;
     let documentChangeListener:
       | ((event: { document: vscode.TextDocument }) => void)
@@ -47,6 +51,10 @@ describe('registerEventHandlers', () => {
     }) as any;
     vscode.window.onDidChangeTextEditorSelection = vi.fn((listener) => {
       selectionListener = listener;
+      return { dispose: vi.fn() };
+    }) as any;
+    vscode.window.onDidChangeTextEditorVisibleRanges = vi.fn((listener) => {
+      visibleRangesListener = listener;
       return { dispose: vi.fn() };
     }) as any;
     vscode.workspace.onDidChangeTextDocument = vi.fn((listener) => {
@@ -78,6 +86,7 @@ describe('registerEventHandlers', () => {
       recreateCodeBlockLanguageDecorationType: vi.fn(),
       recreateColorDependentTypes: vi.fn(),
       clearMathDecorationCache: vi.fn(),
+      updateMermaidForVisibleRanges: vi.fn(),
     };
 
     registerEventHandlers(decorator as any, { setEnabled: vi.fn() } as any);
@@ -95,6 +104,14 @@ describe('registerEventHandlers', () => {
     );
     expect(decorator.updateDecorationsFromChange).toHaveBeenCalledWith({ document });
     expect(decorator.renameFile).toHaveBeenCalledWith('file:///old.md', 'file:///new.md');
+
+    // Scrolling re-anchors mermaid diagrams, but only for the editor in front.
+    visibleRangesListener?.({ textEditor: editor });
+    expect(decorator.updateMermaidForVisibleRanges).toHaveBeenCalledTimes(1);
+
+    const backgroundEditor = new (vscode.TextEditor as any)(document, []);
+    visibleRangesListener?.({ textEditor: backgroundEditor });
+    expect(decorator.updateMermaidForVisibleRanges).toHaveBeenCalledTimes(1);
   });
 
   it('applies configuration and theme changes', () => {
@@ -126,6 +143,7 @@ describe('registerEventHandlers', () => {
       recreateCodeBlockLanguageDecorationType: vi.fn(),
       recreateColorDependentTypes: vi.fn(),
       clearMathDecorationCache: vi.fn(),
+      updateMermaidForVisibleRanges: vi.fn(),
     };
     const linkClickHandler = {
       setEnabled: vi.fn(),

@@ -4,6 +4,7 @@ import type { MermaidBlock } from '../parser';
 import { mapNormalizedToOriginal } from '../position-mapping';
 import { renderMermaidSvg, svgToDataUri, createErrorSvg } from '../mermaid/mermaid-renderer';
 import { MermaidDiagramDecorations } from './mermaid-diagram-decorations';
+import { computeMermaidAnchor } from './mermaid-anchor';
 import { createRange, isSelectionOrCursorInsideOffsets } from './editor-decoration-applier';
 import { logWarn } from '../logging';
 
@@ -74,10 +75,12 @@ export class MermaidUpdateCoordinator {
     normalizedText: string,
     documentVersion: number,
     hoverIndicatorDecorationType: { dispose(): void } & { key?: string },
+    sourceDecorationType: { dispose(): void } & { key?: string },
   ): Promise<void> {
     if (mermaidBlocks.length === 0) {
       this.mermaidDecorations.clear(editor);
       editor.setDecorations(hoverIndicatorDecorationType as never, []);
+      editor.setDecorations(sourceDecorationType as never, []);
       return;
     }
 
@@ -90,14 +93,23 @@ export class MermaidUpdateCoordinator {
 
     const rangesByKey = new Map<string, Range[]>();
     const dataUrisByKey = new Map<string, string>();
+    const lineOffsetsByKey = new Map<string, number>();
     const indicatorRanges: Range[] = [];
+    const sourceRanges: Range[] = [];
     const originalText = editor.document.getText();
     const dataUriPromisesByKey = new Map<string, Promise<string>>();
 
     const results = await mapWithConcurrency(
       mermaidBlocks,
       this.maxConcurrency,
-      async (block): Promise<{ key: string; range: Range; dataUri: string; indicatorRange: Range } | null> => {
+      async (block): Promise<{
+        key: string;
+        range: Range;
+        dataUri: string;
+        indicatorRange: Range;
+        sourceRange: Range;
+        lineOffset: number;
+      } | null> => {
         if (token !== this.mermaidUpdateToken || editor.document.version !== documentVersion) {
           return null;
         }
@@ -106,10 +118,21 @@ export class MermaidUpdateCoordinator {
           return null;
         }
 
-        const range = createRange(editor, block.startPos, block.endPos, normalizedText);
-        if (!range) {
+        const sourceRange = createRange(editor, block.startPos, block.endPos, normalizedText);
+        if (!sourceRange) {
           return null;
         }
+
+        // The image hangs off a single line, and VS Code only builds DOM for
+        // visible lines — anchoring at the block start makes the diagram vanish
+        // once the opening fence scrolls above the viewport.
+        const anchor = computeMermaidAnchor(
+          sourceRange.start.line,
+          sourceRange.end.line,
+          editor.visibleRanges ?? []
+        );
+        const anchorPosition = new Position(anchor.anchorLine, 0);
+        const range = new Range(anchorPosition, anchorPosition);
 
         const blockStart = mapNormalizedToOriginal(block.startPos, normalizedText);
         const openingFenceLineEnd = originalText.indexOf('\n', blockStart);
@@ -122,8 +145,12 @@ export class MermaidUpdateCoordinator {
           new Position(contentStartPos.line, indicatorEndChar)
         );
 
-        const key = getMermaidBlockCacheKey(block, theme, fontFamily);
-        let dataUriPromise = dataUriPromisesByKey.get(key);
+        // The rendered SVG does not depend on the anchor, so it is deduplicated
+        // by svgKey; the decoration type does, because the offset rides on its
+        // margin, so its key carries the offset too.
+        const svgKey = getMermaidBlockCacheKey(block, theme, fontFamily);
+        const key = `${svgKey}:${anchor.lineOffset}`;
+        let dataUriPromise = dataUriPromisesByKey.get(svgKey);
         if (!dataUriPromise) {
           dataUriPromise = (async () => {
             try {
@@ -143,7 +170,7 @@ export class MermaidUpdateCoordinator {
               return svgToDataUri(errorSvg);
             }
           })();
-          dataUriPromisesByKey.set(key, dataUriPromise);
+          dataUriPromisesByKey.set(svgKey, dataUriPromise);
         }
 
         const dataUri = await dataUriPromise;
@@ -151,7 +178,7 @@ export class MermaidUpdateCoordinator {
           return null;
         }
 
-        return { key, range, dataUri, indicatorRange };
+        return { key, range, dataUri, indicatorRange, sourceRange, lineOffset: anchor.lineOffset };
       }
     );
 
@@ -160,17 +187,20 @@ export class MermaidUpdateCoordinator {
         continue;
       }
       dataUrisByKey.set(result.key, result.dataUri);
+      lineOffsetsByKey.set(result.key, result.lineOffset);
       const ranges = rangesByKey.get(result.key) || [];
       ranges.push(result.range);
       rangesByKey.set(result.key, ranges);
       indicatorRanges.push(result.indicatorRange);
+      sourceRanges.push(result.sourceRange);
     }
 
     if (token !== this.mermaidUpdateToken || editor.document.version !== documentVersion) {
       return;
     }
 
-    this.mermaidDecorations.apply(editor, rangesByKey, dataUrisByKey);
+    this.mermaidDecorations.apply(editor, rangesByKey, dataUrisByKey, lineOffsetsByKey);
     editor.setDecorations(hoverIndicatorDecorationType as never, indicatorRanges);
+    editor.setDecorations(sourceDecorationType as never, sourceRanges);
   }
 }

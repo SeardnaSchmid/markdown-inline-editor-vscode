@@ -17,7 +17,7 @@ import { handleCheckboxClick } from './decorator/checkbox-toggle';
 import { MermaidDiagramDecorations } from './decorator/mermaid-diagram-decorations';
 import { DecoratorUpdateScheduler } from './decorator/update-scheduler';
 import { MathDecorations } from './math/math-decorations';
-import { MermaidHoverIndicatorDecorationType } from './decorations';
+import { MermaidHoverIndicatorDecorationType, MermaidSourceDecorationType } from './decorations';
 import { isSupportedMarkdownLanguage } from './language-support';
 import { logDebug, logPerformanceMetric } from './logging';
 import { applyMathDecorationsForEditor } from './decorator/math-region-application';
@@ -29,6 +29,8 @@ const PERFORMANCE_CONSTANTS = {
   DEBOUNCE_TIMEOUT_MS: 150,
   IDLE_CALLBACK_TIMEOUT_MS: 300,
   MERMAID_MAX_CONCURRENCY: 4,
+  /** Scroll events fire per frame; re-anchoring only moves in whole lines. */
+  VISIBLE_RANGE_THROTTLE_MS: 50,
 } as const;
 
 
@@ -70,6 +72,8 @@ export class Decorator {
   );
   private mathDecorations = new MathDecorations();
   private mermaidHoverIndicatorDecorationType = MermaidHoverIndicatorDecorationType();
+  private mermaidSourceDecorationType = MermaidSourceDecorationType();
+  private visibleRangeThrottleTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly fileDecorationState: FileDecorationStateStore;
   private readonly updateScheduler: DecoratorUpdateScheduler;
 
@@ -157,6 +161,49 @@ export class Decorator {
   }
 
   // Checkbox behavior lives in decorator/checkbox-toggle.ts
+
+  /**
+   * Re-anchors Mermaid diagrams after the viewport moved (throttled).
+   *
+   * A diagram image is a `before` attachment on one line, and VS Code only
+   * builds DOM for visible lines, so a diagram whose opening fence scrolls above
+   * the viewport would otherwise disappear. Reads from the parse cache — no
+   * reparse — and touches only the Mermaid decorations.
+   *
+   * @example
+   * decorator.updateMermaidForVisibleRanges();
+   */
+  updateMermaidForVisibleRanges() {
+    if (this.visibleRangeThrottleTimer) {
+      return;
+    }
+
+    this.visibleRangeThrottleTimer = setTimeout(() => {
+      this.visibleRangeThrottleTimer = undefined;
+      this.reanchorMermaidDiagrams();
+    }, PERFORMANCE_CONSTANTS.VISIBLE_RANGE_THROTTLE_MS);
+  }
+
+  private reanchorMermaidDiagrams() {
+    if (!this.activeEditor || !this.isMarkdownDocument()) {
+      return;
+    }
+
+    const document = this.activeEditor.document;
+    if (!this.isEnabledForUri(document.uri.toString())) {
+      return;
+    }
+    if (this.skipDecorationsInDiffView && this.isDiffEditor()) {
+      return;
+    }
+
+    const { mermaidBlocks, text } = this.parseDocument(document);
+    if (mermaidBlocks.length === 0) {
+      return;
+    }
+
+    void this.updateMermaidDiagrams(mermaidBlocks, text, document.version);
+  }
 
   /**
    * Updates decorations for document changes (debounced with batching).
@@ -270,6 +317,7 @@ export class Decorator {
     this.mermaidDecorations.clear(this.activeEditor);
     this.mathDecorations.clear(this.activeEditor);
     this.activeEditor.setDecorations(this.mermaidHoverIndicatorDecorationType, []);
+    this.activeEditor.setDecorations(this.mermaidSourceDecorationType, []);
   }
 
   /**
@@ -446,7 +494,8 @@ export class Decorator {
       mermaidBlocks,
       text,
       documentVersion,
-      this.mermaidHoverIndicatorDecorationType
+      this.mermaidHoverIndicatorDecorationType,
+      this.mermaidSourceDecorationType
     );
   }
 
@@ -654,6 +703,11 @@ export class Decorator {
     this.updateScheduler.dispose();
     this.decorationTypes.dispose();
     this.mermaidHoverIndicatorDecorationType.dispose();
+    this.mermaidSourceDecorationType.dispose();
+    if (this.visibleRangeThrottleTimer) {
+      clearTimeout(this.visibleRangeThrottleTimer);
+      this.visibleRangeThrottleTimer = undefined;
+    }
   }
 
 
