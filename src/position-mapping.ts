@@ -79,30 +79,40 @@ export function mapNormalizedToOriginal(normalizedPos: number, originalText?: st
 
 /**
  * Normalizes heading text to anchor format.
- * 
+ *
  * Converts heading text to the format used in markdown anchor links:
+ * - Percent-decodes fragments such as `%E7%9B%AE%E5%BD%95`
  * - Converts to lowercase
- * - Removes non-word characters (except spaces and hyphens)
+ * - Removes punctuation while keeping Unicode letters, numbers, underscores, spaces, and hyphens
  * - Replaces spaces with hyphens
- * - Collapses multiple hyphens into single hyphen
+ * - Collapses multiple hyphens into a single hyphen
  * - Trims leading/trailing whitespace
- * 
- * This matches the GitHub Flavored Markdown (GFM) anchor link generation algorithm.
- * 
- * @param text - The heading text to normalize
+ *
+ * This approximates GitHub Flavored Markdown (GFM) slug generation, including CJK headings.
+ *
+ * @param text - The heading text or link fragment to normalize
  * @returns Normalized anchor text
- * 
+ *
  * @example
  * ```typescript
  * normalizeAnchorText('Hello World!') // Returns 'hello-world'
- * normalizeAnchorText('  Test  123  ') // Returns 'test-123'
+ * normalizeAnchorText('Skills 目录') // Returns 'skills-目录'
  * normalizeAnchorText('Multiple---Hyphens') // Returns 'multiple-hyphens'
  * ```
  */
 export function normalizeAnchorText(text: string): string {
-  return text
+  // Percent-decode first so encoded CJK fragments still match heading slugs
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(text);
+  } catch {
+    decoded = text;
+  }
+
+  // Keep Unicode letters/digits/underscore (JS \w is ASCII-only and would strip CJK)
+  return decoded
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[^\p{L}\p{N}_\s-]+/gu, '')
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .trim();

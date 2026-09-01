@@ -24,6 +24,11 @@ describe("link-targets", () => {
       expect(result?.toString()).toContain("image.png");
     });
 
+    it("decodes percent-encoded spaces in relative image paths", () => {
+      const result = resolveImageTarget("link%20test.png", documentUri as any);
+      expect(result?.toString()).toContain("link test.png");
+    });
+
     it("resolves external URLs", () => {
       const result = resolveImageTarget(
         "https://example.com/image.png",
@@ -60,6 +65,22 @@ describe("link-targets", () => {
       const result = resolveLinkTarget("relative.md", documentUri as any);
       expect(result?.kind).toBe("uri");
       expect(result?.uri.toString()).toContain("relative.md");
+    });
+
+    it("decodes percent-encoded spaces in relative file links", () => {
+      const result = resolveLinkTarget("link%20test.md", documentUri as any);
+      expect(result?.kind).toBe("uri");
+      expect(result?.uri.toString()).toContain("link test.md");
+      expect(result?.uri.toString()).not.toContain("link%20test.md");
+    });
+
+    it("opens a relative file then jumps to its fragment", () => {
+      const result = resolveLinkTarget("other.md#skills-目录", documentUri as any);
+      expect(result?.kind).toBe("command");
+      if (result?.kind === "command") {
+        expect(result.args[0]).toBe("skills-目录");
+        expect(String(result.args[1])).toContain("other.md");
+      }
     });
   });
 
