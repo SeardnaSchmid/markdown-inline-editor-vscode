@@ -84,7 +84,7 @@ export function processListItem(
     if (markerEnd < end && text[markerEnd] === ' ') {
       markerEnd++;
     }
-    if (tryAddCheckboxDecorations(text, markerStart, markerEnd, end, decorations, false)) {
+    if (tryAddCheckboxDecorations(text, markerStart, markerEnd, end, decorations, scopes, false)) {
       return;
     }
     decorations.push({ startPos: markerStart, endPos: markerEnd, type: 'listItem' });
@@ -118,7 +118,7 @@ export function processListItem(
         writtenNumber !== autoNumber;
 
       if (!autoNumberEnabled) {
-        tryAddCheckboxDecorations(text, markerStart, markerEnd, end, decorations, true);
+        tryAddCheckboxDecorations(text, markerStart, markerEnd, end, decorations, scopes, true);
         return;
       }
 
@@ -129,6 +129,7 @@ export function processListItem(
           markerEnd,
           end,
           decorations,
+          scopes,
           true,
           replacement,
           sourceMismatch,
@@ -181,6 +182,7 @@ function tryAddCheckboxDecorations(
   markerEnd: number,
   end: number,
   decorations: DecorationRange[],
+  scopes: ScopeRange[],
   isOrderedList: boolean,
   orderedReplacement?: string,
   orderedListMarkerMismatch?: boolean,
@@ -215,10 +217,23 @@ function tryAddCheckboxDecorations(
     });
   }
 
+  // The box has to sit on a single real character. VS Code's mouse hit testing
+  // skips a run of characters whose decoration collapses it, so a box drawn as
+  // a pseudo-element over "- [ ]" is not clickable at all; one drawn on the
+  // state character itself is. Everything around it is hidden separately.
+  const boxStart = checkboxStart + 1;
+  const prefixStart = isOrderedList ? checkboxStart : markerStart;
+
+  decorations.push({ startPos: prefixStart, endPos: boxStart, type: 'checkboxBracket' });
   decorations.push({
-    startPos: isOrderedList ? checkboxStart : markerStart,
-    endPos: checkboxEnd,
+    startPos: boxStart,
+    endPos: boxStart + 1,
     type: isChecked ? 'checkboxChecked' : 'checkboxUnchecked',
   });
+  decorations.push({ startPos: boxStart + 1, endPos: checkboxEnd, type: 'checkboxBracket' });
+
+  // One scope over the whole checkbox so moving the cursor onto any part of it
+  // reveals the raw `- [ ]` as a unit rather than half-rendered.
+  addScope(scopes, prefixStart, checkboxEnd, 'checkbox');
   return true;
 }

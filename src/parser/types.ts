@@ -72,6 +72,7 @@ export type DecorationType =
   | "orderedListItem"
   | "checkboxUnchecked"
   | "checkboxChecked"
+  | "checkboxBracket"
   | "horizontalRule"
   | "frontmatter"
   | "frontmatterDelimiter"

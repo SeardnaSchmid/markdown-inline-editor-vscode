@@ -10,8 +10,6 @@ const BRIGHTNESS_OVERLAY_OPACITY = 0.1;
 const CHECKBOX_BOX_SIZE = '1em';
 /** Gap between checkbox and adjacent text. */
 const CHECKBOX_GAP_SIZE = '0.6em';
-/** Left padding applied after the checkbox. */
-const CHECKBOX_PADDING = '0.2em';
 
 /**
  * Determines if the current theme is dark or high contrast.
@@ -482,27 +480,40 @@ export function HorizontalRuleDecorationType(color?: string | ThemeColor) {
 }
 
 /**
- * Creates the before block options for checkbox decorations.
- * Shared between CheckboxUncheckedDecorationType and CheckboxCheckedDecorationType.
+ * Shared box styling for the checkbox decorations.
+ *
+ * The box is drawn on the checkbox's state character (the space or the `x`)
+ * rather than as a pseudo-element over the whole `- [ ]` run. VS Code's mouse
+ * hit testing walks real characters, and it skips over a run that a decoration
+ * has collapsed — a box painted with `::before` on hidden text therefore never
+ * receives a click at all, which is why toggling used to do nothing unless the
+ * click happened to land just outside the box.
+ *
+ * @param resolvedColor - Border colour for the box
  */
-function createCheckboxBeforeOptions(resolvedColor: string | ThemeColor) {
+function checkboxBoxOptions(resolvedColor: string | ThemeColor) {
   return {
-    contentText: ' ',
+    // `color` feeds currentColor for the border drawn below.
     color: resolvedColor,
-    height: CHECKBOX_BOX_SIZE,
-    width: CHECKBOX_BOX_SIZE,
-    border: '1px solid',
-    borderColor: resolvedColor,
-    // Negative margin-right pulls the 'after' element inside the box border.
-    textDecoration: `display: inline-block; box-sizing: border-box; vertical-align: middle; margin-right: -${CHECKBOX_BOX_SIZE}; cursor: pointer;`,
+    // Inline decorations never emit the border properties — only whole-line
+    // ones do — so the box is drawn through the textDecoration escape hatch
+    // the rest of this file already uses.
+    textDecoration: 'none;'
+      + ' display: inline-block; box-sizing: border-box; text-align: center;'
+      + ` width: ${CHECKBOX_BOX_SIZE}; height: ${CHECKBOX_BOX_SIZE}; line-height: 1;`
+      + ' border: 1px solid currentColor; border-radius: 2px;'
+      + ` vertical-align: middle; margin-right: ${CHECKBOX_GAP_SIZE}; cursor: pointer;`,
   };
 }
 
 /**
  * Creates a decoration type for unchecked checkbox styling.
  *
- * Replaces [ ] with an empty checkbox.
- * Click inside the brackets to toggle.
+ * Draws an empty box over the checkbox's state character. The box deliberately
+ * sits on that real character rather than in a `before` attachment: VS Code's
+ * mouse hit testing walks real characters and skips both collapsed runs and
+ * attachment spans, so a box drawn as an attachment never receives a click —
+ * which is why toggling used to do nothing.
  *
  * @param {string | ThemeColor | undefined} color - Optional hex or theme color; when undefined uses editor.foreground
  * @returns {vscode.TextEditorDecorationType} A decoration type for unchecked checkboxes
@@ -510,29 +521,15 @@ function createCheckboxBeforeOptions(resolvedColor: string | ThemeColor) {
 export function CheckboxUncheckedDecorationType(color?: string | ThemeColor) {
   const resolvedColor = color ?? new ThemeColor('editor.foreground');
 
-  return window.createTextEditorDecorationType({
-    textDecoration: 'none; display: none;',
-    before: createCheckboxBeforeOptions(resolvedColor),
-    after: {
-      contentText: ' ',
-      color: resolvedColor,
-      textDecoration: `
-        display: inline-block;
-        position: relative;
-        width: ${CHECKBOX_BOX_SIZE};
-        cursor: pointer;
-        margin-right: ${CHECKBOX_GAP_SIZE};
-        margin-left: ${CHECKBOX_PADDING};
-      `
-    }
-  });
+  return window.createTextEditorDecorationType(checkboxBoxOptions(resolvedColor));
 }
 
 /**
  * Creates a decoration type for checked checkbox styling.
  *
- * Replaces [x] or [X] with a checked checkbox.
- * Click inside the brackets to toggle.
+ * The same box, with the `x` of `[x]` left visible inside it. A tick drawn as a
+ * `before` attachment would cover the middle of the box and make exactly that
+ * part unclickable, so the state character does the job instead.
  *
  * @param {string | ThemeColor | undefined} color - Optional hex or theme color; when undefined uses editor.foreground
  * @returns {vscode.TextEditorDecorationType} A decoration type for checked checkboxes
@@ -540,21 +537,18 @@ export function CheckboxUncheckedDecorationType(color?: string | ThemeColor) {
 export function CheckboxCheckedDecorationType(color?: string | ThemeColor) {
   const resolvedColor = color ?? new ThemeColor('editor.foreground');
 
+  return window.createTextEditorDecorationType(checkboxBoxOptions(resolvedColor));
+}
+
+/**
+ * Creates a decoration type that hides the brackets and list marker around a
+ * rendered checkbox, leaving only the box itself visible.
+ *
+ * @returns {vscode.TextEditorDecorationType} A decoration type hiding checkbox syntax
+ */
+export function CheckboxBracketDecorationType() {
   return window.createTextEditorDecorationType({
     textDecoration: 'none; display: none;',
-    before: createCheckboxBeforeOptions(resolvedColor),
-    after: {
-      contentText: '✔',
-      color: resolvedColor,
-      textDecoration: `
-        display: inline-block;
-        position: relative;
-        width: ${CHECKBOX_BOX_SIZE};
-        cursor: pointer;
-        margin-right: ${CHECKBOX_GAP_SIZE};
-        margin-left: ${CHECKBOX_PADDING};
-      `
-    }
   });
 }
 

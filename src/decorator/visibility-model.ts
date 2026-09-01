@@ -45,8 +45,13 @@ export function filterDecorationsForEditor(
     'blockquote',
     'listItem',
     'orderedListItem',
+  ]);
+  // A rendered checkbox is three decorations over one run of text; they reveal
+  // as a unit off the shared 'checkbox' scope so it never shows half-rendered.
+  const checkboxTypes = new Set<DecorationType>([
     'checkboxUnchecked',
     'checkboxChecked',
+    'checkboxBracket',
   ]);
   const headingTypes = new Set<DecorationType>([
     'heading',
@@ -117,6 +122,17 @@ export function filterDecorationsForEditor(
           selectionOverlayRanges.push(intersection);
         }
       }
+    }
+
+    if (checkboxTypes.has(decoration.type)) {
+      if (rangeIntersectsAny(range, rawRanges) || selectionOrCursorOverlaps(range)) {
+        // Raw state: show the actual `- [ ]` characters
+        continue;
+      }
+      const ranges = filtered.get(decoration.type) || [];
+      ranges.push(range);
+      filtered.set(decoration.type, ranges);
+      continue;
     }
 
     if (selectionOnlyMarkerTypes.has(decoration.type)) {

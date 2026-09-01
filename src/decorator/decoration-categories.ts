@@ -15,6 +15,7 @@ const markerDecorationTypes: ReadonlySet<DecorationType> = new Set<DecorationTyp
   'orderedListItem',
   'checkboxUnchecked',
   'checkboxChecked',
+  'checkboxBracket',
   'horizontalRule',
   'frontmatterDelimiter',
   'tablePipe',
