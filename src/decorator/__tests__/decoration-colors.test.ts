@@ -22,6 +22,7 @@ import {
   HorizontalRuleDecorationType,
   CheckboxUncheckedDecorationType,
   CheckboxCheckedDecorationType,
+  CheckboxBracketDecorationType,
 } from '../../decorations';
 
 describe('decoration creation with color (hex vs theme)', () => {
@@ -139,44 +140,38 @@ describe('decoration creation with color (hex vs theme)', () => {
       expect(CheckboxCheckedDecorationType()).toBeDefined();
     });
 
-    it('CheckboxCheckedDecorationType has after block with contentText "✔"', () => {
-      resetTextEditorDecorationTypeOptionsCapture();
-      CheckboxCheckedDecorationType();
-      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      expect(opts.after).toBeDefined();
-      expect((opts.after as Record<string, unknown>).contentText).toBe('✔');
-    });
-
-    it('CheckboxCheckedDecorationType after block includes display: inline-block in textDecoration', () => {
-      resetTextEditorDecorationTypeOptionsCapture();
-      CheckboxCheckedDecorationType();
-      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      const after = opts.after as Record<string, unknown>;
-      expect(after.textDecoration).toContain('display: inline-block');
-    });
-
-    it('CheckboxCheckedDecorationType after block includes cursor: pointer in textDecoration', () => {
-      resetTextEditorDecorationTypeOptionsCapture();
-      CheckboxCheckedDecorationType();
-      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      const after = opts.after as Record<string, unknown>;
-      expect(after.textDecoration).toContain('cursor: pointer');
-    });
-
-    it('CheckboxUncheckedDecorationType after block has space contentText', () => {
+    // The box must be styled on the decorated character itself. VS Code's mouse
+    // hit testing walks real characters and skips a collapsed run, so a box
+    // painted into a ::before pseudo-element never receives a click.
+    // The box must be styled on the decorated character itself. VS Code's mouse
+    // hit testing walks real characters and skips attachment spans, so a box
+    // drawn into a ::before never receives a click.
+    it('CheckboxUncheckedDecorationType styles the character itself, not an attachment', () => {
       resetTextEditorDecorationTypeOptionsCapture();
       CheckboxUncheckedDecorationType();
       const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      expect(opts.after).toBeDefined();
-      expect((opts.after as Record<string, unknown>).contentText).toBe(' ');
+      expect(opts.before).toBeUndefined();
+      expect(opts.after).toBeUndefined();
+      expect(opts.textDecoration).toContain('border: 1px solid currentColor');
+      expect(opts.textDecoration).toContain('display: inline-block');
+      expect(opts.textDecoration).toContain('cursor: pointer');
     });
 
-    it('CheckboxUncheckedDecorationType after block includes cursor: pointer in textDecoration', () => {
+    it('CheckboxCheckedDecorationType draws the same clickable box, tick-free', () => {
       resetTextEditorDecorationTypeOptionsCapture();
-      CheckboxUncheckedDecorationType();
+      CheckboxCheckedDecorationType();
       const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      const after = opts.after as Record<string, unknown>;
-      expect(after.textDecoration).toContain('cursor: pointer');
+      // A tick attachment would cover the middle of the box and block clicks there.
+      expect(opts.before).toBeUndefined();
+      expect(opts.textDecoration).toContain('border: 1px solid currentColor');
+      expect(opts.textDecoration).toContain('cursor: pointer');
+    });
+
+    it('CheckboxBracketDecorationType hides the surrounding syntax', () => {
+      resetTextEditorDecorationTypeOptionsCapture();
+      CheckboxBracketDecorationType();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.textDecoration).toContain('display: none');
     });
   });
 

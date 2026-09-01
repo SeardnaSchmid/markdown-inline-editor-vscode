@@ -28,6 +28,7 @@ import {
   HorizontalRuleDecorationType,
   CheckboxUncheckedDecorationType,
   CheckboxCheckedDecorationType,
+  CheckboxBracketDecorationType,
   FrontmatterDecorationType,
   FrontmatterDelimiterDecorationType,
   EmojiDecorationType,
@@ -89,6 +90,7 @@ export class DecorationTypeRegistry {
   private horizontalRuleDecorationType!: TextEditorDecorationType;
   private checkboxUncheckedDecorationType!: TextEditorDecorationType;
   private checkboxCheckedDecorationType!: TextEditorDecorationType;
+  private checkboxBracketDecorationType!: TextEditorDecorationType;
   private frontmatterDecorationType!: TextEditorDecorationType;
   private frontmatterDelimiterDecorationType!: TextEditorDecorationType;
   private emojiDecorationType!: TextEditorDecorationType;
@@ -131,6 +133,7 @@ export class DecorationTypeRegistry {
     this.horizontalRuleDecorationType = HorizontalRuleDecorationType(this.options.getHorizontalRuleColor?.());
     this.checkboxUncheckedDecorationType = CheckboxUncheckedDecorationType(this.options.getCheckboxColor?.());
     this.checkboxCheckedDecorationType = CheckboxCheckedDecorationType(this.options.getCheckboxColor?.());
+    this.checkboxBracketDecorationType = CheckboxBracketDecorationType();
     this.frontmatterDecorationType = FrontmatterDecorationType();
     this.frontmatterDelimiterDecorationType = FrontmatterDelimiterDecorationType(this.options.getFrontmatterDelimiterOpacity());
     this.emojiDecorationType = EmojiDecorationType();
@@ -166,6 +169,7 @@ export class DecorationTypeRegistry {
       ['horizontalRule', this.horizontalRuleDecorationType],
       ['checkboxUnchecked', this.checkboxUncheckedDecorationType],
       ['checkboxChecked', this.checkboxCheckedDecorationType],
+      ['checkboxBracket', this.checkboxBracketDecorationType],
       ['frontmatter', this.frontmatterDecorationType],
       ['frontmatterDelimiter', this.frontmatterDelimiterDecorationType],
       ['emoji', this.emojiDecorationType],

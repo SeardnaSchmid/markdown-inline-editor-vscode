@@ -117,4 +117,68 @@ describe('handleCheckboxClick', () => {
       expect(edits[0].newText).toBe('x');
     });
   });
+
+  // The rendered box replaces the whole task-list prefix, not just "[ ]".
+  // The parser emits the decoration from markerStart for bullet lists
+  // (see parser/list-quote.ts), and that whole span is display:none, so a click
+  // on the box lands on the decoration start — the list marker, not the bracket.
+  describe('click lands on the list marker (rendered box hit area)', () => {
+    it('toggles when the cursor lands on the bullet marker at char 0', () => {
+      const editor = makeEditor('- [ ] task', 0);
+      expect(handleCheckboxClick(editor as any)).toBe(true);
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
+      const edits = edit.getEdits();
+      expect(edits[0].range.start.character).toBe(3); // bracketStart(2) + 1
+      expect(edits[0].newText).toBe('x');
+    });
+
+    it('toggles when the cursor lands on the space between marker and bracket', () => {
+      const editor = makeEditor('- [ ] task', 1);
+      expect(handleCheckboxClick(editor as any)).toBe(true);
+      expect((workspace.applyEdit as Mock).mock.calls[0][0].getEdits()[0].newText).toBe('x');
+    });
+
+    it('toggles a checked box clicked at the marker', () => {
+      const editor = makeEditor('* [x] done', 0);
+      expect(handleCheckboxClick(editor as any)).toBe(true);
+      expect((workspace.applyEdit as Mock).mock.calls[0][0].getEdits()[0].newText).toBe(' ');
+    });
+
+    it('toggles an indented nested item clicked at its marker', () => {
+      //   "  - [ ] nested" — marker at char 2, bracket at char 4
+      const editor = makeEditor('  - [ ] nested', 2);
+      expect(handleCheckboxClick(editor as any)).toBe(true);
+      const edits = (workspace.applyEdit as Mock).mock.calls[0][0].getEdits();
+      expect(edits[0].range.start.character).toBe(5); // bracketStart(4) + 1
+    });
+
+    it('does not toggle from the indent whitespace before the marker', () => {
+      // Ordered lists keep the decoration at the bracket, and leading indent is
+      // never part of the rendered box for either list kind.
+      const editor = makeEditor('  - [ ] nested', 0);
+      expect(handleCheckboxClick(editor as any)).toBe(false);
+      expect(workspace.applyEdit).not.toHaveBeenCalled();
+    });
+
+    it('does not extend the hit area to the marker for ordered lists', () => {
+      // parser/list-quote.ts anchors ordered-list checkboxes at checkboxStart,
+      // so "1." stays clickable text rather than part of the box.
+      const editor = makeEditor('1. [ ] task', 0);
+      expect(handleCheckboxClick(editor as any)).toBe(false);
+      expect(workspace.applyEdit).not.toHaveBeenCalled();
+    });
+
+    it('toggles an ordered-list checkbox clicked on its bracket', () => {
+      const editor = makeEditor('1. [ ] task', 3);
+      expect(handleCheckboxClick(editor as any)).toBe(true);
+      expect((workspace.applyEdit as Mock).mock.calls[0][0].getEdits()[0].newText).toBe('x');
+    });
+
+    it('leaves a non-task bracket pair on a list line alone', () => {
+      // "- see [ ] below" is not a task item: the bracket is not the first token.
+      const editor = makeEditor('- see [ ] below', 0);
+      expect(handleCheckboxClick(editor as any)).toBe(false);
+      expect(workspace.applyEdit).not.toHaveBeenCalled();
+    });
+  });
 });
