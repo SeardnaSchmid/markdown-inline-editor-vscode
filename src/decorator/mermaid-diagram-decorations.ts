@@ -73,9 +73,12 @@ export class MermaidDiagramDecorations {
     // Re-anchored diagrams hang off a lower line, so shift them back up by the
     // rows they skipped. The overflow is clipped by the viewport, which is
     // exactly the part that scrolled away.
-    const margin = lineOffset > 0
-      ? `-${lineOffset * getEditorLineHeight()}px 0 0 0`
-      : undefined;
+    // The attachment renders as an inline pseudo-element, and vertical margins
+    // do not apply to inline boxes, so it has to become inline-block for the
+    // shift to take effect at all.
+    const shiftUp = lineOffset > 0
+      ? `margin-top: -${lineOffset * getEditorLineHeight()}px;`
+      : '';
 
     // Mermaid themes handle colors internally, so we don't need to invert.
     // Only the image lives here; the block's source is collapsed separately by
@@ -83,8 +86,7 @@ export class MermaidDiagramDecorations {
     const decorationType = window.createTextEditorDecorationType({
       before: {
         contentIconPath: Uri.parse(dataUri),
-        textDecoration: 'none;',
-        margin,
+        textDecoration: `none; display: inline-block; vertical-align: top; ${shiftUp}`,
       },
     });
 
