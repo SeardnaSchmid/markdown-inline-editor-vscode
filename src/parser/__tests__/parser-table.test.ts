@@ -104,6 +104,32 @@ describe('MarkdownParser - Tables', () => {
         expect(c.replacement).toBeDefined();
       });
     });
+
+    it('should treat Hangul syllables as double-width like other CJK', () => {
+      const hangul = parser.extractDecorations('| A |\n|---|\n| \uD55C\uAE00 |');
+      const han = parser.extractDecorations('| A |\n|---|\n| \u4F60\u597D |');
+      const hangulCell = byType(hangul, 'tableCell').find((c) =>
+        c.replacement!.includes('\uD55C\uAE00')
+      );
+      const hanCell = byType(han, 'tableCell').find((c) => c.replacement!.includes('\u4F60\u597D'));
+      expect(hangulCell).toBeDefined();
+      expect(hanCell).toBeDefined();
+      // Two Hangul syllables span the same columns as two Han characters,
+      // so both cells must be padded identically.
+      expect(hangulCell!.replacement!.length).toBe(hanCell!.replacement!.length);
+    });
+
+    it('should treat fullwidth forms as double-width', () => {
+      const fullwidth = parser.extractDecorations('| A |\n|---|\n| \uFF21\uFF22 |');
+      const han = parser.extractDecorations('| A |\n|---|\n| \u4F60\u597D |');
+      const fullwidthCell = byType(fullwidth, 'tableCell').find((c) =>
+        c.replacement!.includes('\uFF21\uFF22')
+      );
+      const hanCell = byType(han, 'tableCell').find((c) => c.replacement!.includes('\u4F60\u597D'));
+      expect(fullwidthCell).toBeDefined();
+      expect(hanCell).toBeDefined();
+      expect(fullwidthCell!.replacement!.length).toBe(hanCell!.replacement!.length);
+    });
   });
 
   describe('inline formatting in cells', () => {

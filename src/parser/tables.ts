@@ -77,9 +77,16 @@ export function measureTextWidth(plain: string): number {
   for (const char of plain) {
     const code = char.codePointAt(0)!;
     if (
+      (code >= 0x1100 && code <= 0x115f) || // Hangul Jamo
       (code >= 0x2e80 && code <= 0x9fff) ||
+      (code >= 0xa960 && code <= 0xa97f) || // Hangul Jamo Extended-A
+      (code >= 0xac00 && code <= 0xd7a3) || // Hangul syllables
+      (code >= 0xd7b0 && code <= 0xd7ff) || // Hangul Jamo Extended-B
       (code >= 0xf900 && code <= 0xfaff) ||
+      (code >= 0xfe10 && code <= 0xfe19) || // Vertical forms
       (code >= 0xfe30 && code <= 0xfe4f) ||
+      (code >= 0xff01 && code <= 0xff60) || // Fullwidth forms
+      (code >= 0xffe0 && code <= 0xffe6) || // Fullwidth signs
       (code >= 0x20000 && code <= 0x2fa1f)
     ) {
       width += 2;
