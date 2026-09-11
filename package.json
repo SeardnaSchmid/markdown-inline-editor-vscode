@@ -323,6 +323,6 @@
     "rimraf": "^6.1.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.11"
   }
 }
