@@ -8,10 +8,6 @@ const BRIGHTNESS_OVERLAY_OPACITY = 0.1;
 
 /** Size of the checkbox box (width and height). */
 const CHECKBOX_BOX_SIZE = '1em';
-/** Gap between checkbox and adjacent text. */
-const CHECKBOX_GAP_SIZE = '0.6em';
-/** Left padding applied after the checkbox. */
-const CHECKBOX_PADDING = '0.2em';
 
 /**
  * Determines if the current theme is dark or high contrast.
@@ -33,6 +29,27 @@ export function HideDecorationType() {
     // Hide the item
     textDecoration: 'none; display: none;',
     // This forces the editor to re-layout following text correctly
+    after: {
+      contentText: '',
+    },
+  });
+}
+
+/**
+ * Creates a decoration type that collapses the list marker of a rendered
+ * checkbox.
+ *
+ * This must be its own decoration type instance, not a reuse of
+ * {@link HideDecorationType}: decorations are applied with one
+ * `setDecorations` call per parser type, so two parser types sharing an
+ * instance make each call overwrite the other (which made markers flicker
+ * into view).
+ *
+ * @returns {vscode.TextEditorDecorationType} A decoration type that hides a checkbox marker
+ */
+export function CheckboxMarkerDecorationType() {
+  return window.createTextEditorDecorationType({
+    textDecoration: 'none; display: none;',
     after: {
       contentText: '',
     },
@@ -482,27 +499,32 @@ export function HorizontalRuleDecorationType(color?: string | ThemeColor) {
 }
 
 /**
- * Creates the before block options for checkbox decorations.
- * Shared between CheckboxUncheckedDecorationType and CheckboxCheckedDecorationType.
+ * Creates the box options shared by both checkbox states.
+ *
+ * The box and the state glyph are the same element, so the glyph is centered
+ * inside the box by construction. `pointer-events: none` keeps this overlay
+ * from swallowing the click that has to reach the real `[ ]` range underneath;
+ * the negative-margin pair cancels the box's own width so the range keeps its
+ * 3-character footprint and the box stays centered within it.
  */
-function createCheckboxBeforeOptions(resolvedColor: string | ThemeColor) {
+function createCheckboxBeforeOptions(resolvedColor: string | ThemeColor, contentText: string) {
   return {
-    contentText: ' ',
+    contentText,
     color: resolvedColor,
     height: CHECKBOX_BOX_SIZE,
     width: CHECKBOX_BOX_SIZE,
     border: '1px solid',
     borderColor: resolvedColor,
-    // Negative margin-right pulls the 'after' element inside the box border.
-    textDecoration: `display: inline-block; box-sizing: border-box; vertical-align: middle; margin-right: -${CHECKBOX_BOX_SIZE}; cursor: pointer;`,
+    textDecoration: `display: inline-block; box-sizing: border-box; vertical-align: middle; text-align: center; line-height: calc(${CHECKBOX_BOX_SIZE} - 2px); margin-left: calc((3ch - ${CHECKBOX_BOX_SIZE}) / 2); margin-right: calc((${CHECKBOX_BOX_SIZE} - 3ch) / 2 - ${CHECKBOX_BOX_SIZE}); pointer-events: none;`,
   };
 }
 
 /**
  * Creates a decoration type for unchecked checkbox styling.
  *
- * Replaces [ ] with an empty checkbox.
- * Click inside the brackets to toggle.
+ * The range stays laid out (its glyphs are hidden with `color`, not by
+ * collapsing it) so it is a real, hoverable, clickable target, and `cursor`
+ * gives it the pointer. The box itself is drawn by the `before` overlay.
  *
  * @param {string | ThemeColor | undefined} color - Optional hex or theme color; when undefined uses editor.foreground
  * @returns {vscode.TextEditorDecorationType} A decoration type for unchecked checkboxes
@@ -511,28 +533,17 @@ export function CheckboxUncheckedDecorationType(color?: string | ThemeColor) {
   const resolvedColor = color ?? new ThemeColor('editor.foreground');
 
   return window.createTextEditorDecorationType({
-    textDecoration: 'none; display: none;',
-    before: createCheckboxBeforeOptions(resolvedColor),
-    after: {
-      contentText: ' ',
-      color: resolvedColor,
-      textDecoration: `
-        display: inline-block;
-        position: relative;
-        width: ${CHECKBOX_BOX_SIZE};
-        cursor: pointer;
-        margin-right: ${CHECKBOX_GAP_SIZE};
-        margin-left: ${CHECKBOX_PADDING};
-      `
-    }
+    color: 'transparent',
+    cursor: 'pointer',
+    textDecoration: 'none;',
+    before: createCheckboxBeforeOptions(resolvedColor, ' '),
   });
 }
 
 /**
  * Creates a decoration type for checked checkbox styling.
  *
- * Replaces [x] or [X] with a checked checkbox.
- * Click inside the brackets to toggle.
+ * Same box as the unchecked state, with a check glyph drawn inside it.
  *
  * @param {string | ThemeColor | undefined} color - Optional hex or theme color; when undefined uses editor.foreground
  * @returns {vscode.TextEditorDecorationType} A decoration type for checked checkboxes
@@ -541,20 +552,10 @@ export function CheckboxCheckedDecorationType(color?: string | ThemeColor) {
   const resolvedColor = color ?? new ThemeColor('editor.foreground');
 
   return window.createTextEditorDecorationType({
-    textDecoration: 'none; display: none;',
-    before: createCheckboxBeforeOptions(resolvedColor),
-    after: {
-      contentText: '✔',
-      color: resolvedColor,
-      textDecoration: `
-        display: inline-block;
-        position: relative;
-        width: ${CHECKBOX_BOX_SIZE};
-        cursor: pointer;
-        margin-right: ${CHECKBOX_GAP_SIZE};
-        margin-left: ${CHECKBOX_PADDING};
-      `
-    }
+    color: 'transparent',
+    cursor: 'pointer',
+    textDecoration: 'none;',
+    before: createCheckboxBeforeOptions(resolvedColor, '✔'),
   });
 }
 
