@@ -1,53 +1,84 @@
-import { Position, Range, Selection, WorkspaceEdit, type TextEditor, workspace } from 'vscode';
+import { Position, Range, WorkspaceEdit, type TextEditor, workspace } from 'vscode';
+import type { ParseEntry } from '../markdown-parse-cache';
+import { createRange } from './editor-decoration-applier';
+
+export type CheckboxTarget = {
+  /** Full parser-defined unit that the rendered checkbox can hit. */
+  hitRange: Range;
+  /** Source `[ ]` or `[x]` range whose middle character stores the state. */
+  syntaxRange: Range;
+  checked: boolean;
+};
 
 /**
- * Handles checkbox toggle when user clicks inside [ ] or [x].
- * Detects if cursor is positioned inside a checkbox and toggles it.
- *
- * @returns true if a checkbox was toggled, false otherwise
+ * Builds checkbox click targets from the same cached parser result used to
+ * render them. This keeps click eligibility identical to render eligibility:
+ * code, malformed task markers, blockquotes, and nested lists need no second
+ * Markdown implementation here.
  */
-export function handleCheckboxClick(editor: TextEditor): boolean {
-  const selection = editor.selection;
+export function buildCheckboxTargets(editor: TextEditor, entry: ParseEntry): CheckboxTarget[] {
+  const checkboxScopes = entry.scopes.filter((scope) => scope.kind === 'checkbox');
+  const targets: CheckboxTarget[] = [];
 
-  // Only handle single cursor clicks (no selection range)
-  if (!selection.isEmpty) return false;
-
-  const document = editor.document;
-  const line = document.lineAt(selection.active.line);
-  const cursorChar = selection.active.character;
-
-  // Find checkbox pattern on this line: [ ] or [x] or [X]
-  const checkboxRegex = /\[([ xX])\]/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = checkboxRegex.exec(line.text)) !== null) {
-    const bracketStart = match.index;
-    const bracketEnd = match.index + 3; // [ ] is 3 chars
-
-    // Check if cursor is on or inside the checkbox [ ] range
-    // Include bracketStart because clicking the ☐ decoration lands cursor there
-    if (cursorChar >= bracketStart && cursorChar <= bracketEnd) {
-      const currentState = match[1];
-      const newState = currentState === ' ' ? 'x' : ' ';
-
-      // Toggle the checkbox
-      const edit = new WorkspaceEdit();
-      const charPosition = new Position(selection.active.line, bracketStart + 1);
-      edit.replace(
-        document.uri,
-        new Range(charPosition, charPosition.translate(0, 1)),
-        newState
-      );
-
-      workspace.applyEdit(edit);
-
-      // Move cursor after the checkbox to avoid re-triggering
-      const newCursorPos = new Position(selection.active.line, bracketEnd + 1);
-      editor.selection = new Selection(newCursorPos, newCursorPos);
-
-      return true;
+  for (const decoration of entry.decorations) {
+    if (decoration.type !== 'checkboxUnchecked' && decoration.type !== 'checkboxChecked') {
+      continue;
     }
+
+    const scope = checkboxScopes.find(
+      (candidate) =>
+        candidate.startPos <= decoration.startPos && candidate.endPos >= decoration.endPos
+    );
+    if (!scope) continue;
+
+    const hitRange = createRange(editor, scope.startPos, scope.endPos, entry.text);
+    const syntaxRange = createRange(
+      editor,
+      decoration.startPos,
+      decoration.endPos,
+      entry.text
+    );
+    if (!hitRange || !syntaxRange) continue;
+
+    targets.push({
+      hitRange,
+      syntaxRange,
+      checked: decoration.type === 'checkboxChecked',
+    });
   }
 
-  return false;
+  return targets;
+}
+
+/**
+ * Toggles a rendered checkbox when the mouse selection lands in a
+ * parser-defined checkbox target.
+ *
+ * The decorator restores the selection that was active before the click.
+ *
+ * @returns true if a checkbox edit was requested, false otherwise
+ */
+export function handleCheckboxClick(
+  editor: TextEditor,
+  targets: readonly CheckboxTarget[]
+): boolean {
+  const selection = editor.selection;
+  if (!selection.isEmpty) return false;
+
+  const target = targets.find(({ hitRange }) => hitRange.contains(selection.active));
+  if (!target) return false;
+
+  const statePosition = new Position(
+    target.syntaxRange.start.line,
+    target.syntaxRange.start.character + 1
+  );
+  const edit = new WorkspaceEdit();
+  edit.replace(
+    editor.document.uri,
+    new Range(statePosition, statePosition.translate(0, 1)),
+    target.checked ? ' ' : 'x'
+  );
+
+  void workspace.applyEdit(edit);
+  return true;
 }

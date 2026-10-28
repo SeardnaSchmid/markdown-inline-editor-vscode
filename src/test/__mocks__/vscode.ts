@@ -68,24 +68,56 @@ export const Position = class {
 
 export const Uri = {
   parse: (value: string) => {
-    const schemeMatch = value.match(/^([^:]+):/);
+    const hashIndex = value.indexOf("#");
+    const baseValue = hashIndex !== -1 ? value.substring(0, hashIndex) : value;
+    const fragment = hashIndex !== -1 ? value.substring(hashIndex + 1) : "";
+    const schemeMatch = baseValue.match(/^([^:]+):/);
     const scheme = schemeMatch ? schemeMatch[1] : "file";
     return {
       toString: () => value,
       scheme: scheme,
+      fragment: fragment,
+      with: function (change: { fragment?: string; path?: string }) {
+        const newFrag = change.fragment !== undefined ? change.fragment : fragment;
+        const newBase = change.path ?? baseValue;
+        const fullStr = newFrag ? `${newBase}#${newFrag}` : newBase;
+        return Uri.parse(fullStr);
+      },
     };
   },
-  file: (path: string) => ({
-    toString: () => `file://${path}`,
-    scheme: "file",
-  }),
-  joinPath: (base: any, ...segments: string[]) => {
-    const basePath = base.toString().replace("file://", "");
-    const joined = [basePath, ...segments].join("/");
-    return {
-      toString: () => `file://${joined}`,
+  file: (path: string) => {
+    const uri = {
+      path: path,
       scheme: "file",
+      fragment: "",
+      toString: () => `file://${path}${uri.fragment ? "#" + uri.fragment : ""}`,
+      with: function (change: { fragment?: string; path?: string }) {
+        const newPath = change.path ?? uri.path;
+        const newFrag = change.fragment !== undefined ? change.fragment : uri.fragment;
+        const updated = Uri.file(newPath);
+        (updated as any).fragment = newFrag;
+        return updated;
+      },
     };
+    return uri;
+  },
+  joinPath: (base: any, ...segments: string[]) => {
+    const basePath = (base.path ?? base.toString().replace("file://", "")).split("#")[0];
+    const joined = [basePath, ...segments].join("/");
+    const uri = {
+      path: joined,
+      scheme: base.scheme ?? "file",
+      fragment: base.fragment ?? "",
+      toString: () => `file://${joined}${uri.fragment ? "#" + uri.fragment : ""}`,
+      with: function (change: { fragment?: string; path?: string }) {
+        const newPath = change.path ?? uri.path;
+        const newFrag = change.fragment !== undefined ? change.fragment : uri.fragment;
+        const updated = Uri.file(newPath);
+        (updated as any).fragment = newFrag;
+        return updated;
+      },
+    };
+    return uri;
   },
 };
 

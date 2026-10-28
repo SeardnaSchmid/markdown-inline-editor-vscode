@@ -85,6 +85,45 @@ describe('emoji decoration', () => {
   });
 });
 
+describe('checkbox reveal behavior', () => {
+  const text = '- [ ] task';
+  const decs: DecorationRange[] = [
+    { startPos: 0, endPos: 2, type: 'checkboxMarker' } as any,
+    { startPos: 2, endPos: 5, type: 'checkboxUnchecked' } as any,
+  ];
+  const doc = new TextDocument(Uri.file('test.md'), 'markdown', 1, text);
+  const scopes: ScopeEntry[] = [
+    {
+      startPos: 0,
+      endPos: text.length,
+      kind: 'listItem',
+      range: new Range(doc.positionAt(0), doc.positionAt(text.length)) as any,
+    },
+    {
+      startPos: 0,
+      endPos: 5,
+      kind: 'checkbox',
+      range: new Range(doc.positionAt(0), doc.positionAt(5)) as any,
+    },
+  ];
+
+  it('keeps the bullet hidden when the cursor is elsewhere on the line', () => {
+    // Regression: the `listItem` scope spans the whole line, so a scope-based
+    // reveal would unhide the bullet whenever the cursor is anywhere on it.
+    const editor = makeEditor(text, 0, 9); // on "task", outside the checkbox
+    const result = filterDecorationsForEditor(editor as any, decs, scopes, text, simpleRangeFactory);
+    expect(result.get('checkboxMarker')?.length).toBe(1);
+    expect(result.get('checkboxUnchecked')?.length).toBe(1);
+  });
+
+  it('reveals the marker and the box together when the cursor is on the checkbox', () => {
+    const editor = makeEditor(text, 0, 3); // inside `[ ]`
+    const result = filterDecorationsForEditor(editor as any, decs, scopes, text, simpleRangeFactory);
+    expect(result.get('checkboxMarker')).toBeUndefined();
+    expect(result.get('checkboxUnchecked')).toBeUndefined();
+  });
+});
+
 describe('table decoration rendering', () => {
   it('renders tablePipe with replacement text when cursor is off the table', () => {
     const text = '| A |\n| - |\nother';
@@ -150,6 +189,114 @@ describe('table decoration rendering', () => {
     expect(cells).toBeDefined();
     expect(cells[0].renderOptions?.before?.contentText).toBe(' bold ');
     expect(cells[0].renderOptions?.before?.fontWeight).toBe('bold');
+  });
+
+  it('applies cellStyle color to tableCell', () => {
+    const text = '| Head |\nother';
+    const decs: DecorationRange[] = [
+      {
+        startPos: 0,
+        endPos: 1,
+        type: 'tableCell',
+        replacement: ' Head ',
+        cellStyle: { color: 'var(--vscode-textLink-foreground)' },
+      } as any,
+    ];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const cells = result.get('tableCell') as any[];
+    expect(cells[0].renderOptions?.before?.color).toBe('var(--vscode-textLink-foreground)');
+  });
+});
+
+describe('preview-style table layout', () => {
+  function renderCell(decoration: Partial<DecorationRange>) {
+    const text = '| A |\nother';
+    const decs: DecorationRange[] = [
+      { startPos: 2, endPos: 3, type: 'tableCell', replacement: 'A', ...decoration } as any,
+    ];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    return (result.get('tableCell') as any[])[0].renderOptions?.before;
+  }
+
+  it('lays the cell out as a fixed-width box', () => {
+    const before = renderCell({ boxWidth: 8, cellAlign: 'left' });
+    expect(before.contentText).toBe('A');
+    expect(before.textDecoration).toContain('display: inline-block');
+    expect(before.textDecoration).toContain('box-sizing: border-box');
+    expect(before.textDecoration).toContain('width: 8ch');
+    expect(before.textDecoration).toContain('overflow: hidden');
+    expect(before.textDecoration).toContain('text-align: left');
+  });
+
+  it('applies the column alignment', () => {
+    expect(renderCell({ boxWidth: 8, cellAlign: 'right' }).textDecoration)
+      .toContain('text-align: right');
+    expect(renderCell({ boxWidth: 8, cellAlign: 'center' }).textDecoration)
+      .toContain('text-align: center');
+  });
+
+  it('renders header cells bold', () => {
+    expect(renderCell({ boxWidth: 8, isHeaderCell: true }).fontWeight).toBe('bold');
+    expect(renderCell({ boxWidth: 8 }).fontWeight).toBeUndefined();
+  });
+
+  it('draws a bottom border only when a row separator is requested', () => {
+    const withSeparator = renderCell({ boxWidth: 8, drawRowSeparator: true });
+    expect(withSeparator.textDecoration).toContain('border-bottom-width: 1px');
+    expect(withSeparator.borderColor).toBeDefined();
+
+    const withoutSeparator = renderCell({ boxWidth: 8 });
+    expect(withoutSeparator.textDecoration).not.toContain('border-bottom-width');
+    expect(withoutSeparator.borderColor).toBeUndefined();
+  });
+
+  it('keeps the cell style text-decoration as the base value', () => {
+    const before = renderCell({
+      boxWidth: 8,
+      cellStyle: { textDecoration: 'line-through' },
+    });
+    expect(before.textDecoration.startsWith('line-through;')).toBe(true);
+    expect(before.textDecoration).toContain('display: inline-block');
+  });
+
+  it('leaves grid-style cells untouched when no box width is given', () => {
+    const before = renderCell({ replacement: ' A ' });
+    expect(before.contentText).toBe(' A ');
+    expect(before.textDecoration).toBeUndefined();
+  });
+
+  it('renders the separator row as a rule spanning the table', () => {
+    const text = '|---|\nother';
+    const decs: DecorationRange[] = [
+      { startPos: 0, endPos: 5, type: 'tableRule', replacement: '', boxWidth: 16 } as any,
+    ];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const before = (result.get('tableRule') as any[])[0].renderOptions?.before;
+    expect(before.contentText).toBe('');
+    expect(before.textDecoration).toContain('width: 16ch');
+    expect(before.textDecoration).toContain('border-bottom-width: 1px');
+    expect(before.borderColor).toBeDefined();
   });
 });
 

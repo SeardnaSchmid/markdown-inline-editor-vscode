@@ -141,4 +141,29 @@ describe('scanMathRegions - fence-aware behavior', () => {
     const text = '```math\na+b';
     expect(scanMathRegions(text)).toHaveLength(0);
   });
+
+  it('skips $ inside inline code backticks', () => {
+    const text = 'The regex `^(\\d{4})$` matches years, not math.';
+    const regions = scanMathRegions(text);
+    expect(regions).toHaveLength(0);
+  });
+
+  it('does not allow inline math to span across blank lines / paragraph boundaries', () => {
+    const text = 'Here is a price $10\n\nAnd another price $20';
+    const regions = scanMathRegions(text);
+    expect(regions).toHaveLength(0);
+  });
+
+  it('correctly isolates inline code with regex $ from subsequent valid inline math', () => {
+    const text = [
+      '**Clarification**: The ISO regex at line 51 (`/^(\\d{4})(?:-(\\d{1,2}))?(?:-(\\d{1,2}))?$/`) matches hyphens only.',
+      '',
+      '- **Resolution**: Ambiguous month/day numbers ($\\le 12$) return `null`.',
+    ].join('\n');
+
+    const regions = scanMathRegions(text);
+    expect(regions).toHaveLength(1);
+    expect(regions[0].source).toBe('\\le 12');
+    expect(regions[0].displayMode).toBe(false);
+  });
 });

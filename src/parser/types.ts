@@ -10,11 +10,20 @@ export interface DecorationRange {
     fontWeight?: string;
     fontStyle?: string;
     textDecoration?: string;
+    color?: string;
   };
   slug?: string;
   issueNumber?: number;
   ownerRepo?: string;
   orderedListMarkerMismatch?: boolean;
+  /** Preview-style tables: width of the cell (or rule) box, in character widths. */
+  boxWidth?: number;
+  /** Preview-style tables: horizontal alignment of the cell content. */
+  cellAlign?: "left" | "center" | "right";
+  /** Preview-style tables: the cell belongs to the header row and is rendered bold. */
+  isHeaderCell?: boolean;
+  /** Preview-style tables: draw a thin rule along the bottom edge of the cell box. */
+  drawRowSeparator?: boolean;
 }
 
 export interface ScopeRange {
@@ -55,6 +64,7 @@ export type DecorationType =
   | "italic"
   | "boldItalic"
   | "strikethrough"
+  | "highlight"
   | "code"
   | "codeBlock"
   | "codeBlockLanguage"
@@ -72,12 +82,14 @@ export type DecorationType =
   | "orderedListItem"
   | "checkboxUnchecked"
   | "checkboxChecked"
+  | "checkboxMarker"
   | "horizontalRule"
   | "frontmatter"
   | "frontmatterDelimiter"
   | "tablePipe"
   | "tableSeparatorPipe"
   | "tableSeparatorDash"
+  | "tableRule"
   | "tableCell"
   | "mention"
   | "issueReference";

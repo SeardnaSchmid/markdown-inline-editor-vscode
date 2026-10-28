@@ -136,6 +136,12 @@
           "description": "Render LaTeX math inline ($...$ and $$...$$)",
           "markdownDescription": "Render LaTeX math inline ($...$ and $$...$$). When disabled, math delimiters are shown as plain text."
         },
+        "markdownInlineEditor.highlight.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render highlighted text (==text==)",
+          "markdownDescription": "Render highlighted text (==text==) inline in Markdown documents. When disabled, == delimiters are shown as plain text."
+        },
         "markdownInlineEditor.orderedLists.autoNumber": {
           "type": "boolean",
           "default": true,
@@ -147,6 +153,48 @@
           "default": true,
           "description": "Highlight when the source marker number differs from the computed number",
           "markdownDescription": "When ordered list auto-numbering is on, use the warning color for the displayed marker when the number in the source text does not match the computed number (for example all lines use `1.` but the view shows 1., 2., 3.)."
+        },
+        "markdownInlineEditor.tables.style": {
+          "type": "string",
+          "enum": [
+            "preview",
+            "grid"
+          ],
+          "enumDescriptions": [
+            "Render tables like the markdown preview: no pipes, aligned columns, bold header, thin rules",
+            "Render tables as a character grid using │ pipes and a dashed separator row"
+          ],
+          "default": "grid",
+          "description": "How GFM tables are rendered inline",
+          "markdownDescription": "How GFM tables are rendered inline.\n\n- `preview`: hides the `|` pipes and lays every cell out as a fixed-width box, so columns line up regardless of the editor font. Adds a bold header, a rule under the header row and thin row separators. Recommended for documents that mix CJK and ASCII text.\n- `grid`: the original character-grid look, which relies on the font rendering full-width characters at exactly the configured ratio."
+        },
+        "markdownInlineEditor.tables.cjkWidthRatio": {
+          "type": "number",
+          "default": 2,
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Display width of a CJK character relative to an ASCII character",
+          "markdownDescription": "Display width of a full-width (CJK) character relative to an ASCII character, used to size table columns. `2` matches fonts where a full-width glyph is exactly two half-width glyphs (for example BIZ UDGothic, UDEV Gothic, PlemolJP). Increase it if CJK text is clipped, decrease it if columns are too wide."
+        },
+        "markdownInlineEditor.tables.maxColumnWidth": {
+          "type": "number",
+          "default": 48,
+          "minimum": 3,
+          "maximum": 200,
+          "description": "Maximum table column width, in character widths",
+          "markdownDescription": "Maximum width of a single table column, in character widths. Longer cell content is clipped in the rendered view; move the cursor into the table to see the full raw text. Only used when `#markdownInlineEditor.tables.style#` is `preview`."
+        },
+        "markdownInlineEditor.tables.highlightHeaders": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight table header cells",
+          "markdownDescription": "Color the cells of a table's header row with the theme's link color."
+        },
+        "markdownInlineEditor.tables.rowSeparators": {
+          "type": "boolean",
+          "default": true,
+          "description": "Draw a thin rule under every table row",
+          "markdownDescription": "Draw a thin rule under every table row, like the markdown preview. Only used when `#markdownInlineEditor.tables.style#` is `preview`."
         },
         "markdownInlineEditor.mentions.enabled": {
           "type": "boolean",
@@ -260,6 +308,18 @@
           "description": "Hex color for checkbox (unchecked and checked)",
           "format": "color",
           "markdownDescription": "Hex color for unchecked and checked checkbox symbols. Leave empty to use theme default."
+        },
+        "markdownInlineEditor.colors.highlight": {
+          "type": "string",
+          "description": "Hex color for highlighted text",
+          "format": "color",
+          "markdownDescription": "Hex color for highlighted text. Leave empty to use theme default."
+        },
+        "markdownInlineEditor.colors.highlightBackground": {
+          "type": "string",
+          "description": "Hex color for highlight background",
+          "format": "color",
+          "markdownDescription": "Hex color for highlight background overlay. Leave empty to use theme default (semi-transparent yellow)."
         }
       }
     }
@@ -292,37 +352,38 @@
     "prepublishOnly": "npm run clean && npm run build"
   },
   "overrides": {
+    "@azure/msal-node": "^7.1.2",
     "diff": "^8.0.3",
     "serialize-javascript": "^7.0.4"
   },
   "dependencies": {
     "cheerio": "1.2.0",
-    "katex": "^0.17.0",
+    "katex": "^0.19.1",
     "mathjax-full": "^3.2.2",
-    "mermaid": "11.15.0",
+    "mermaid": "12.2.0",
     "remark-gfm": "4.0.1",
     "remark-parse": "11.0.0",
     "unified": "11.0.5",
-    "unist-util-visit": "5.1.0"
+    "unist-util-visit": "5.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@tsconfig/node-lts": "^24.0.0",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@tsconfig/node-lts": "^24.0.1",
+    "@vitest/coverage-v8": "^5.0.5",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.6.6",
     "@types/unist": "^3.0.3",
     "@types/vscode": "1.100.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.9.2",
-    "esbuild": "^0.28.0",
-    "eslint": "^10.4.1",
-    "git-cliff": "^2.13.1",
-    "ovsx": "^1.0.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.13.0",
+    "git-cliff": "^2.14.2",
+    "ovsx": "^1.3.0",
     "rimraf": "^6.1.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.60.1",
-    "vitest": "^4.1.8"
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
   }
 }

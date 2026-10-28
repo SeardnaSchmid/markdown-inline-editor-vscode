@@ -75,10 +75,10 @@ describe('normalizeAnchorText', () => {
     expect(normalizeAnchorText('a  b')).toBe('a-b'); // spaces → hyphens → collapsed
   });
 
-  it('converts leading/trailing spaces to hyphens (spaces are replaced before trim)', () => {
-    // Spaces are first replaced with hyphens, then trim() removes only whitespace — not hyphens.
-    // So '  test  ' → '-test-' (spaces at edges become hyphens, trim has nothing to remove).
-    expect(normalizeAnchorText('  test  ')).toBe('-test-');
+  it('trims leading/trailing spaces without creating leading/trailing hyphens', () => {
+    // Matches JSDoc example: normalizeAnchorText('  Test  123  ') returns 'test-123'
+    expect(normalizeAnchorText('  test  ')).toBe('test');
+    expect(normalizeAnchorText('  Test  123  ')).toBe('test-123');
   });
 
   it('handles numbers', () => {
@@ -95,6 +95,15 @@ describe('normalizeAnchorText', () => {
 
   it('handles empty string', () => {
     expect(normalizeAnchorText('')).toBe('');
+  });
+
+  it('keeps CJK letters in heading slugs', () => {
+    expect(normalizeAnchorText('Skills 目录')).toBe('skills-目录');
+    expect(normalizeAnchorText('skills-目录')).toBe('skills-目录');
+  });
+
+  it('decodes percent-encoded CJK fragments', () => {
+    expect(normalizeAnchorText('skills-%E7%9B%AE%E5%BD%95')).toBe('skills-目录');
   });
 });
 

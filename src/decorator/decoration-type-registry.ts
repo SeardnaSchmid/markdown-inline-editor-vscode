@@ -1,12 +1,14 @@
 import type { TextEditorDecorationType } from 'vscode';
 import {
   HideDecorationType,
+  CheckboxMarkerDecorationType,
   TransparentDecorationType,
   GhostFaintDecorationType,
   BoldDecorationType,
   ItalicDecorationType,
   BoldItalicDecorationType,
   StrikethroughDecorationType,
+  HighlightDecorationType,
   CodeDecorationType,
   CodeBlockDecorationType,
   CodeBlockLanguageDecorationType,
@@ -34,6 +36,7 @@ import {
   TablePipeDecorationType,
   TableSeparatorPipeDecorationType,
   TableSeparatorDashDecorationType,
+  TableRuleDecorationType,
   TableCellDecorationType,
 } from '../decorations';
 import type { DecorationType } from '../parser';
@@ -58,16 +61,20 @@ type RegistryOptions = {
   getImageColor?: () => string | undefined;
   getHorizontalRuleColor?: () => string | undefined;
   getCheckboxColor?: () => string | undefined;
+  getHighlightColor?: () => string | undefined;
+  getHighlightBackgroundColor?: () => string | undefined;
 };
 
 export class DecorationTypeRegistry {
   private hideDecorationType!: TextEditorDecorationType;
+  private checkboxMarkerDecorationType!: TextEditorDecorationType;
   private transparentDecorationType!: TextEditorDecorationType;
   private ghostFaintDecorationType!: TextEditorDecorationType;
   private boldDecorationType!: TextEditorDecorationType;
   private italicDecorationType!: TextEditorDecorationType;
   private boldItalicDecorationType!: TextEditorDecorationType;
   private strikethroughDecorationType!: TextEditorDecorationType;
+  private highlightDecorationType!: TextEditorDecorationType;
   private codeDecorationType!: TextEditorDecorationType;
   private codeBlockDecorationType!: TextEditorDecorationType;
   private codeBlockLanguageDecorationType!: TextEditorDecorationType;
@@ -95,18 +102,24 @@ export class DecorationTypeRegistry {
   private tablePipeDecorationType!: TextEditorDecorationType;
   private tableSeparatorPipeDecorationType!: TextEditorDecorationType;
   private tableSeparatorDashDecorationType!: TextEditorDecorationType;
+  private tableRuleDecorationType!: TextEditorDecorationType;
   private tableCellDecorationType!: TextEditorDecorationType;
 
   private decorationTypeMap = new Map<DecorationType, TextEditorDecorationType>();
 
   constructor(private options: RegistryOptions) {
     this.hideDecorationType = HideDecorationType();
+    this.checkboxMarkerDecorationType = CheckboxMarkerDecorationType();
     this.transparentDecorationType = TransparentDecorationType();
     this.ghostFaintDecorationType = GhostFaintDecorationType(this.options.getGhostFaintOpacity());
     this.boldDecorationType = BoldDecorationType(this.options.getEmphasisColor?.());
     this.italicDecorationType = ItalicDecorationType(this.options.getEmphasisColor?.());
     this.boldItalicDecorationType = BoldItalicDecorationType(this.options.getEmphasisColor?.());
     this.strikethroughDecorationType = StrikethroughDecorationType();
+    this.highlightDecorationType = HighlightDecorationType(
+      this.options.getHighlightColor?.(),
+      this.options.getHighlightBackgroundColor?.(),
+    );
     this.codeDecorationType = CodeDecorationType(this.options.getInlineCodeColor?.(), this.options.getInlineCodeBackgroundColor?.());
     this.codeBlockDecorationType = CodeBlockDecorationType();
     this.codeBlockLanguageDecorationType = CodeBlockLanguageDecorationType(this.options.getCodeBlockLanguageOpacity());
@@ -137,6 +150,7 @@ export class DecorationTypeRegistry {
     this.tablePipeDecorationType = TablePipeDecorationType();
     this.tableSeparatorPipeDecorationType = TableSeparatorPipeDecorationType();
     this.tableSeparatorDashDecorationType = TableSeparatorDashDecorationType();
+    this.tableRuleDecorationType = TableRuleDecorationType();
     this.tableCellDecorationType = TableCellDecorationType();
 
     this.decorationTypeMap = new Map<DecorationType, TextEditorDecorationType>([
@@ -146,6 +160,7 @@ export class DecorationTypeRegistry {
       ['italic', this.italicDecorationType],
       ['boldItalic', this.boldItalicDecorationType],
       ['strikethrough', this.strikethroughDecorationType],
+      ['highlight', this.highlightDecorationType],
       ['code', this.codeDecorationType],
       ['codeBlock', this.codeBlockDecorationType],
       ['codeBlockLanguage', this.codeBlockLanguageDecorationType],
@@ -166,12 +181,14 @@ export class DecorationTypeRegistry {
       ['horizontalRule', this.horizontalRuleDecorationType],
       ['checkboxUnchecked', this.checkboxUncheckedDecorationType],
       ['checkboxChecked', this.checkboxCheckedDecorationType],
+      ['checkboxMarker', this.checkboxMarkerDecorationType],
       ['frontmatter', this.frontmatterDecorationType],
       ['frontmatterDelimiter', this.frontmatterDelimiterDecorationType],
       ['emoji', this.emojiDecorationType],
       ['tablePipe', this.tablePipeDecorationType],
       ['tableSeparatorPipe', this.tableSeparatorPipeDecorationType],
       ['tableSeparatorDash', this.tableSeparatorDashDecorationType],
+      ['tableRule', this.tableRuleDecorationType],
       ['tableCell', this.tableCellDecorationType],
       // Keep this last so it is applied after backgrounds.
       ['selectionOverlay', this.selectionOverlayDecorationType],
@@ -235,6 +252,12 @@ export class DecorationTypeRegistry {
     this.recreateDecorationType(this.horizontalRuleDecorationType, () => HorizontalRuleDecorationType(this.options.getHorizontalRuleColor?.()), (t) => { this.horizontalRuleDecorationType = t; }, 'horizontalRule');
     this.recreateDecorationType(this.checkboxUncheckedDecorationType, () => CheckboxUncheckedDecorationType(this.options.getCheckboxColor?.()), (t) => { this.checkboxUncheckedDecorationType = t; }, 'checkboxUnchecked');
     this.recreateDecorationType(this.checkboxCheckedDecorationType, () => CheckboxCheckedDecorationType(this.options.getCheckboxColor?.()), (t) => { this.checkboxCheckedDecorationType = t; }, 'checkboxChecked');
+    this.recreateDecorationType(
+      this.highlightDecorationType,
+      () => HighlightDecorationType(this.options.getHighlightColor?.(), this.options.getHighlightBackgroundColor?.()),
+      (t) => { this.highlightDecorationType = t; },
+      'highlight',
+    );
   }
 
   recreateGhostFaintDecorationType(): void {

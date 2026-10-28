@@ -1,7 +1,7 @@
-import { DecorationOptions, Range, TextEditor, TextDocument, TextDocumentChangeEvent, window, TextEditorSelectionChangeKind, Memento } from 'vscode';
+import { DecorationOptions, Range, TextEditor, TextDocument, TextDocumentChangeEvent, Selection, window, TextEditorSelectionChangeKind, Memento } from 'vscode';
 import { DecorationRange, DecorationType, MermaidBlock, MathRegion, ScopeRange } from './parser';
 import { config } from './config';
-import { isDiffLikeUri, isDiffViewVisible } from './diff-context';
+import { isEditorInDiffView } from './diff-context';
 import { MarkdownParseCache } from './markdown-parse-cache';
 import {
   applyFilteredDecorations,
@@ -13,7 +13,7 @@ import { FileDecorationStateStore } from './decorator/file-decoration-state';
 import { MermaidUpdateCoordinator } from './decorator/mermaid-update-coordinator';
 import { DecorationTypeRegistry } from './decorator/decoration-type-registry';
 import { filterDecorationsForEditor, ScopeEntry } from './decorator/visibility-model';
-import { handleCheckboxClick } from './decorator/checkbox-toggle';
+import { buildCheckboxTargets, handleCheckboxClick } from './decorator/checkbox-toggle';
 import { MermaidDiagramDecorations } from './decorator/mermaid-diagram-decorations';
 import { DecoratorUpdateScheduler } from './decorator/update-scheduler';
 import { MathDecorations } from './math/math-decorations';
@@ -30,6 +30,7 @@ const PERFORMANCE_CONSTANTS = {
   IDLE_CALLBACK_TIMEOUT_MS: 300,
   MERMAID_MAX_CONCURRENCY: 4,
 } as const;
+
 
 
 /**
@@ -56,6 +57,19 @@ export class Decorator {
    * Undefined in production; never called when decorations are disabled.
    */
   onApply: ((nonEmptyTypeCount: number) => void) | undefined = undefined;
+
+  /**
+   * Selections captured before the most recent non-toggle selection change.
+   * Restored after a checkbox toggle so clicking a checkbox leaves the caret
+   * exactly where it was.
+   */
+  private savedSelections: readonly Selection[] | undefined;
+  /** Guards {@link savedSelections} while we restore it after a toggle. */
+  private restoringSelection = false;
+  /** Timestamp/position of the last toggle, for the post-toggle gesture window. */
+  private lastToggleAt = 0;
+  private lastToggleLine = -1;
+  private lastToggleCol = -1;
 
   private parseCache: MarkdownParseCache;
 
@@ -100,6 +114,8 @@ export class Decorator {
       getImageColor: () => config.colors.image(),
       getHorizontalRuleColor: () => config.colors.horizontalRule(),
       getCheckboxColor: () => config.colors.checkbox(),
+      getHighlightColor: () => config.colors.highlight(),
+      getHighlightBackgroundColor: () => config.colors.highlightBackground(),
     });
   }
 
@@ -146,10 +162,60 @@ export class Decorator {
       return;
     }
 
-    // Check for checkbox click (single cursor, no selection)
-    // If checkbox was toggled, skip decoration update to avoid flicker
-    if (kind === TextEditorSelectionChangeKind.Mouse && handleCheckboxClick(this.activeEditor)) {
+    const selections = this.activeEditor.selections;
+    const sel = selections.length === 1 ? selections[0] : undefined;
+
+    // Right after a successful toggle Monaco can emit the tail of the same
+    // gesture: a few pixels of movement register as a drag, or the second pulse
+    // of a double-click — both arrive as Mouse selection changes on the box.
+    // Swallow them so the checkbox never leaves a stray selection (which would
+    // reveal raw markdown) and never double-toggles.
+    const withinToggleWindow = Date.now() - this.lastToggleAt < 600;
+    if (withinToggleWindow && kind === TextEditorSelectionChangeKind.Mouse) {
+      const nearLastToggle =
+        sel !== undefined &&
+        sel.active.line === this.lastToggleLine &&
+        sel.active.character <= this.lastToggleCol + 4 &&
+        sel.active.character >= this.lastToggleCol - 2;
+      if ((sel && !sel.isEmpty) || (sel && sel.isEmpty && nearLastToggle)) {
+        if (this.savedSelections && this.savedSelections.length > 0) {
+          this.restoringSelection = true;
+          this.activeEditor.selections = this.savedSelections;
+          this.restoringSelection = false;
+        }
+        return;
+      }
+    }
+
+    // Check for checkbox click. When one was toggled, put back whatever
+    // selection was active before the click: VS Code collapsed it as part of
+    // the click, and toggling must not disturb the user's selection (whether a
+    // caret or a text range).
+    const toggled =
+      kind === TextEditorSelectionChangeKind.Mouse &&
+      handleCheckboxClick(
+        this.activeEditor,
+        buildCheckboxTargets(this.activeEditor, this.parseCache.get(this.activeEditor.document))
+      );
+    if (toggled) {
+      this.lastToggleAt = Date.now();
+      if (sel) {
+        this.lastToggleLine = sel.active.line;
+        this.lastToggleCol = sel.active.character;
+      }
+      if (this.savedSelections && this.savedSelections.length > 0) {
+        this.restoringSelection = true;
+        this.activeEditor.selections = this.savedSelections;
+        this.restoringSelection = false;
+      }
       return;
+    }
+
+    // Remember the current selection as the restore target for the next click.
+    // Skip while we are restoring. Caret and ranges are both kept — a range the
+    // user is sitting on must survive a checkbox toggle.
+    if (!this.restoringSelection) {
+      this.savedSelections = selections.map((s) => new Selection(s.anchor, s.active));
     }
 
     // Immediate update without debounce for selection changes
@@ -395,14 +461,7 @@ export class Decorator {
       return false;
     }
 
-    if (isDiffLikeUri(this.activeEditor.document.uri)) {
-      return true;
-    }
-
-    // For side-by-side diff views, check all visible editors
-    // If ANY visible editor is in a diff context, we're in a diff view
-    // This ensures both sides of the diff have decorations disabled
-    return isDiffViewVisible(window.visibleTextEditors);
+    return isEditorInDiffView(this.activeEditor, window.visibleTextEditors);
   }
 
   /**

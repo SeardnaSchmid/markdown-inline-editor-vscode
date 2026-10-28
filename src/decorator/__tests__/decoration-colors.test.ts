@@ -22,6 +22,7 @@ import {
   HorizontalRuleDecorationType,
   CheckboxUncheckedDecorationType,
   CheckboxCheckedDecorationType,
+  HighlightDecorationType,
 } from '../../decorations';
 
 describe('decoration creation with color (hex vs theme)', () => {
@@ -139,44 +140,42 @@ describe('decoration creation with color (hex vs theme)', () => {
       expect(CheckboxCheckedDecorationType()).toBeDefined();
     });
 
-    it('CheckboxCheckedDecorationType has after block with contentText "✔"', () => {
+    it('CheckboxCheckedDecorationType draws the check inside the box overlay', () => {
       resetTextEditorDecorationTypeOptionsCapture();
       CheckboxCheckedDecorationType();
       const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      expect(opts.after).toBeDefined();
-      expect((opts.after as Record<string, unknown>).contentText).toBe('✔');
+      expect(opts.before).toBeDefined();
+      expect((opts.before as Record<string, unknown>).contentText).toBe('✔');
     });
 
-    it('CheckboxCheckedDecorationType after block includes display: inline-block in textDecoration', () => {
-      resetTextEditorDecorationTypeOptionsCapture();
-      CheckboxCheckedDecorationType();
-      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      const after = opts.after as Record<string, unknown>;
-      expect(after.textDecoration).toContain('display: inline-block');
-    });
-
-    it('CheckboxCheckedDecorationType after block includes cursor: pointer in textDecoration', () => {
-      resetTextEditorDecorationTypeOptionsCapture();
-      CheckboxCheckedDecorationType();
-      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      const after = opts.after as Record<string, unknown>;
-      expect(after.textDecoration).toContain('cursor: pointer');
-    });
-
-    it('CheckboxUncheckedDecorationType after block has space contentText', () => {
+    it('CheckboxUncheckedDecorationType draws an empty box overlay', () => {
       resetTextEditorDecorationTypeOptionsCapture();
       CheckboxUncheckedDecorationType();
       const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      expect(opts.after).toBeDefined();
-      expect((opts.after as Record<string, unknown>).contentText).toBe(' ');
+      expect(opts.before).toBeDefined();
+      expect((opts.before as Record<string, unknown>).contentText).toBe(' ');
     });
 
-    it('CheckboxUncheckedDecorationType after block includes cursor: pointer in textDecoration', () => {
+    it('checkbox range stays hoverable: pointer cursor, transparent glyphs, not collapsed', () => {
       resetTextEditorDecorationTypeOptionsCapture();
       CheckboxUncheckedDecorationType();
       const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
-      const after = opts.after as Record<string, unknown>;
-      expect(after.textDecoration).toContain('cursor: pointer');
+      // The range must remain a real, hoverable, hit-testable target. Collapsing
+      // it or moving the cursor off it is what made the checkbox unclickable.
+      expect(opts.cursor).toBe('pointer');
+      expect(opts.color).toBe('transparent');
+      expect(opts.textDecoration).toBe('none;');
+      expect(opts.after).toBeUndefined();
+    });
+
+    it('checkbox box is a single centered overlay that lets clicks through', () => {
+      resetTextEditorDecorationTypeOptionsCapture();
+      CheckboxCheckedDecorationType();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      const before = opts.before as Record<string, unknown>;
+      expect(before.textDecoration).toContain('display: inline-block');
+      expect(before.textDecoration).toContain('text-align: center');
+      expect(before.textDecoration).toContain('pointer-events: none');
     });
   });
 
@@ -201,6 +200,41 @@ describe('decoration creation with color (hex vs theme)', () => {
     it('creates code decoration with ThemeColor background', () => {
       expect(CodeDecorationType('#e5c07b', new ThemeColor('editor.background'))).toBeDefined();
       expect(CodeDecorationType(undefined, new ThemeColor('editor.background'))).toBeDefined();
+    });
+  });
+
+  describe('HighlightDecorationType color parameters', () => {
+    beforeEach(() => {
+      resetTextEditorDecorationTypeOptionsCapture();
+    });
+
+    it('creates highlight decoration with default background and border radius in textDecoration', () => {
+      const dt = HighlightDecorationType();
+      expect(dt).toBeDefined();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.textDecoration).toContain('background-color:');
+      expect(opts.textDecoration).toContain('border-radius: 3px;');
+      expect(opts.color).toBeUndefined();
+    });
+
+    it('creates highlight decoration with custom text color', () => {
+      HighlightDecorationType('#000000');
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.color).toBe('#000000');
+    });
+
+    it('creates highlight decoration with custom backgroundColor injected into textDecoration', () => {
+      HighlightDecorationType(undefined, '#ffeb3b');
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.textDecoration).toContain('background-color: #ffeb3b;');
+      expect(opts.textDecoration).toContain('border-radius: 3px;');
+    });
+
+    it('creates highlight decoration with ThemeColor background', () => {
+      HighlightDecorationType(undefined, new ThemeColor('editor.wordHighlightBackground'));
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.backgroundColor).toBeInstanceOf(ThemeColor);
+      expect(opts.borderRadius).toBe('3px');
     });
   });
 });

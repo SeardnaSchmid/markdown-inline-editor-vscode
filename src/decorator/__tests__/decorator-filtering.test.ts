@@ -598,6 +598,47 @@ describe('Marker decoration categorization', () => {
       expect(isMarkerDecorationType(type)).toBe(true);
     });
     expect(isMarkerDecorationType('bold')).toBe(false);
+    expect(isMarkerDecorationType('highlight')).toBe(false);
     expect(isMarkerDecorationType('link')).toBe(false);
+  });
+});
+
+describe('Highlight filtering (3-state)', () => {
+  const text = 'Line 0\nprefix ==highlight== suffix\nLine 2';
+  // 'prefix ' is 7 chars, so '==highlight==' is at line 1, offset 14..27
+  const decorations: DecorationRange[] = [
+    { startPos: 14, endPos: 16, type: 'hide' },
+    { startPos: 16, endPos: 25, type: 'highlight' },
+    { startPos: 25, endPos: 27, type: 'hide' },
+  ];
+  const scopes: Array<[number, number]> = [[14, 27]];
+
+  it('renders highlight and hides markers when cursor is on another line (Rendered state)', () => {
+    const selection = new Selection(new Position(0, 0), new Position(0, 0));
+    const filtered = filterDecorationsForSelection(text, decorations, scopes, selection);
+
+    expect(filtered.get('highlight')?.length).toBe(1);
+    expect(filtered.get('hide')?.length).toBe(2);
+    expect(filtered.has('ghostFaint')).toBe(false);
+  });
+
+  it('shows faint markers when cursor is on same line but outside highlight (Ghost state)', () => {
+    // line 1, character 0 (on "prefix", outside ==highlight==)
+    const selection = new Selection(new Position(1, 0), new Position(1, 0));
+    const filtered = filterDecorationsForSelection(text, decorations, scopes, selection);
+
+    expect(filtered.get('highlight')?.length).toBe(1);
+    expect(filtered.get('hide')?.length ?? 0).toBe(0);
+    expect(filtered.get('ghostFaint')?.length).toBe(2);
+  });
+
+  it('shows raw markers when cursor is inside highlight (Raw state)', () => {
+    // line 1, character 10 (inside "highlight")
+    const selection = new Selection(new Position(1, 10), new Position(1, 10));
+    const filtered = filterDecorationsForSelection(text, decorations, scopes, selection);
+
+    expect(filtered.get('highlight')?.length).toBe(1);
+    expect(filtered.get('hide')?.length ?? 0).toBe(0);
+    expect(filtered.get('ghostFaint')?.length ?? 0).toBe(0);
   });
 });

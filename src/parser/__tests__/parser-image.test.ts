@@ -160,5 +160,23 @@ describe('MarkdownParser - Images', () => {
       expect(result.some(d => d.type === 'hide' && d.startPos === 9 && d.endPos === 10)).toBe(true); // closing *
     });
   });
+
+  describe('image with parentheses in URL', () => {
+    it('should hide entire URL and closing parenthesis when URL contains parentheses', () => {
+      const markdown = '![Diagram](https://example.com/assets/diagram_(v1).png)';
+      const result = parser.extractDecorations(markdown);
+
+      const imageDec = result.find(d => d.type === 'image');
+      expect(imageDec).toBeDefined();
+      expect(imageDec?.url).toBe('https://example.com/assets/diagram_(v1).png');
+
+      // The closing parenthesis of the image (last char) must be hidden
+      expect(
+        result.some(
+          d => d.type === 'hide' && d.startPos === markdown.length - 1 && d.endPos === markdown.length
+        )
+      ).toBe(true);
+    });
+  });
 });
 
