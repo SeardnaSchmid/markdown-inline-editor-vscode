@@ -754,8 +754,9 @@ export class MarkdownParser {
         type: "hide",
       });
 
-      const parenEnd = text.indexOf(")", parenStart + 1);
-      if (parenEnd !== -1 && parenEnd <= end) {
+      // Find closing parenthesis of the link (search backwards from end to handle parens in URL)
+      const parenEnd = text.lastIndexOf(")", end - 1);
+      if (parenEnd !== -1 && parenEnd > parenStart && parenEnd <= end) {
         // Hide URL content between parentheses
         const urlStart = parenStart + 1;
         if (urlStart < parenEnd) {
@@ -879,8 +880,9 @@ export class MarkdownParser {
           type: "hide",
         });
 
-        const parenEnd = text.indexOf(")", parenStart + 1);
-        if (parenEnd !== -1 && parenEnd <= end) {
+        // Find closing parenthesis of the image (search backwards from end to handle parens in URL)
+        const parenEnd = text.lastIndexOf(")", end - 1);
+        if (parenEnd !== -1 && parenEnd > parenStart && parenEnd <= end) {
           const urlStart = parenStart + 1;
           if (urlStart < parenEnd) {
             decorations.push({
