@@ -7,6 +7,7 @@ import {
   ItalicDecorationType,
   BoldItalicDecorationType,
   StrikethroughDecorationType,
+  HighlightDecorationType,
   CodeDecorationType,
   CodeBlockDecorationType,
   CodeBlockLanguageDecorationType,
@@ -58,6 +59,8 @@ type RegistryOptions = {
   getImageColor?: () => string | undefined;
   getHorizontalRuleColor?: () => string | undefined;
   getCheckboxColor?: () => string | undefined;
+  getHighlightColor?: () => string | undefined;
+  getHighlightBackgroundColor?: () => string | undefined;
 };
 
 export class DecorationTypeRegistry {
@@ -68,6 +71,7 @@ export class DecorationTypeRegistry {
   private italicDecorationType!: TextEditorDecorationType;
   private boldItalicDecorationType!: TextEditorDecorationType;
   private strikethroughDecorationType!: TextEditorDecorationType;
+  private highlightDecorationType!: TextEditorDecorationType;
   private codeDecorationType!: TextEditorDecorationType;
   private codeBlockDecorationType!: TextEditorDecorationType;
   private codeBlockLanguageDecorationType!: TextEditorDecorationType;
@@ -107,6 +111,10 @@ export class DecorationTypeRegistry {
     this.italicDecorationType = ItalicDecorationType(this.options.getEmphasisColor?.());
     this.boldItalicDecorationType = BoldItalicDecorationType(this.options.getEmphasisColor?.());
     this.strikethroughDecorationType = StrikethroughDecorationType();
+    this.highlightDecorationType = HighlightDecorationType(
+      this.options.getHighlightColor?.(),
+      this.options.getHighlightBackgroundColor?.(),
+    );
     this.codeDecorationType = CodeDecorationType(this.options.getInlineCodeColor?.(), this.options.getInlineCodeBackgroundColor?.());
     this.codeBlockDecorationType = CodeBlockDecorationType();
     this.codeBlockLanguageDecorationType = CodeBlockLanguageDecorationType(this.options.getCodeBlockLanguageOpacity());
@@ -146,6 +154,7 @@ export class DecorationTypeRegistry {
       ['italic', this.italicDecorationType],
       ['boldItalic', this.boldItalicDecorationType],
       ['strikethrough', this.strikethroughDecorationType],
+      ['highlight', this.highlightDecorationType],
       ['code', this.codeDecorationType],
       ['codeBlock', this.codeBlockDecorationType],
       ['codeBlockLanguage', this.codeBlockLanguageDecorationType],
@@ -235,6 +244,12 @@ export class DecorationTypeRegistry {
     this.recreateDecorationType(this.horizontalRuleDecorationType, () => HorizontalRuleDecorationType(this.options.getHorizontalRuleColor?.()), (t) => { this.horizontalRuleDecorationType = t; }, 'horizontalRule');
     this.recreateDecorationType(this.checkboxUncheckedDecorationType, () => CheckboxUncheckedDecorationType(this.options.getCheckboxColor?.()), (t) => { this.checkboxUncheckedDecorationType = t; }, 'checkboxUnchecked');
     this.recreateDecorationType(this.checkboxCheckedDecorationType, () => CheckboxCheckedDecorationType(this.options.getCheckboxColor?.()), (t) => { this.checkboxCheckedDecorationType = t; }, 'checkboxChecked');
+    this.recreateDecorationType(
+      this.highlightDecorationType,
+      () => HighlightDecorationType(this.options.getHighlightColor?.(), this.options.getHighlightBackgroundColor?.()),
+      (t) => { this.highlightDecorationType = t; },
+      'highlight',
+    );
   }
 
   recreateGhostFaintDecorationType(): void {

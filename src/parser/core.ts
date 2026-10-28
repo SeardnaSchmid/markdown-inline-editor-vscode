@@ -28,6 +28,7 @@ import {
 import {
   processFrontmatter as processFrontmatterHelper,
 } from "./frontmatter";
+import { scanHighlightMarkers } from "./highlight";
 import {
   filterDecorationsInCodeBlocks as filterDecorationsInCodeBlocksHelper,
   scanMentionAndIssueRefs as scanMentionAndIssueRefsHelper,
@@ -184,6 +185,11 @@ export class MarkdownParser {
 
       // Handle edge cases: empty image alt text that remark doesn't parse as Image node
       this.handleEmptyImageAlt(normalizedText, decorations);
+
+      // Highlights: ==highlighted text==
+      if (config.highlight.enabled()) {
+        scanHighlightMarkers(normalizedText, decorations, scopes);
+      }
 
       // GitHub-style mentions and issue references (@username, @org/team, #123, @user/repo#456)
       if (config.mentions.enabled()) {

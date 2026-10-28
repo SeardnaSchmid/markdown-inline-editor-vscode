@@ -22,6 +22,7 @@ import {
   HorizontalRuleDecorationType,
   CheckboxUncheckedDecorationType,
   CheckboxCheckedDecorationType,
+  HighlightDecorationType,
 } from '../../decorations';
 
 describe('decoration creation with color (hex vs theme)', () => {
@@ -201,6 +202,41 @@ describe('decoration creation with color (hex vs theme)', () => {
     it('creates code decoration with ThemeColor background', () => {
       expect(CodeDecorationType('#e5c07b', new ThemeColor('editor.background'))).toBeDefined();
       expect(CodeDecorationType(undefined, new ThemeColor('editor.background'))).toBeDefined();
+    });
+  });
+
+  describe('HighlightDecorationType color parameters', () => {
+    beforeEach(() => {
+      resetTextEditorDecorationTypeOptionsCapture();
+    });
+
+    it('creates highlight decoration with default background and border radius in textDecoration', () => {
+      const dt = HighlightDecorationType();
+      expect(dt).toBeDefined();
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.textDecoration).toContain('background-color:');
+      expect(opts.textDecoration).toContain('border-radius: 3px;');
+      expect(opts.color).toBeUndefined();
+    });
+
+    it('creates highlight decoration with custom text color', () => {
+      HighlightDecorationType('#000000');
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.color).toBe('#000000');
+    });
+
+    it('creates highlight decoration with custom backgroundColor injected into textDecoration', () => {
+      HighlightDecorationType(undefined, '#ffeb3b');
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.textDecoration).toContain('background-color: #ffeb3b;');
+      expect(opts.textDecoration).toContain('border-radius: 3px;');
+    });
+
+    it('creates highlight decoration with ThemeColor background', () => {
+      HighlightDecorationType(undefined, new ThemeColor('editor.wordHighlightBackground'));
+      const opts = getLastTextEditorDecorationTypeOptions() as Record<string, unknown>;
+      expect(opts.backgroundColor).toBeInstanceOf(ThemeColor);
+      expect(opts.borderRadius).toBe('3px');
     });
   });
 });
