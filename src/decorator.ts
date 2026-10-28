@@ -1,7 +1,7 @@
 import { DecorationOptions, Range, TextEditor, TextDocument, TextDocumentChangeEvent, window, TextEditorSelectionChangeKind, Memento } from 'vscode';
 import { DecorationRange, DecorationType, MermaidBlock, MathRegion, ScopeRange } from './parser';
 import { config } from './config';
-import { isDiffLikeUri, isDiffViewVisible } from './diff-context';
+import { isDiffLikeUri, isDiffViewVisible, isEditorInDiffView } from './diff-context';
 import { MarkdownParseCache } from './markdown-parse-cache';
 import {
   applyFilteredDecorations,
@@ -395,14 +395,7 @@ export class Decorator {
       return false;
     }
 
-    if (isDiffLikeUri(this.activeEditor.document.uri)) {
-      return true;
-    }
-
-    // For side-by-side diff views, check all visible editors
-    // If ANY visible editor is in a diff context, we're in a diff view
-    // This ensures both sides of the diff have decorations disabled
-    return isDiffViewVisible(window.visibleTextEditors);
+    return isEditorInDiffView(this.activeEditor, window.visibleTextEditors);
   }
 
   /**

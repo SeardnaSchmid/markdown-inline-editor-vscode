@@ -1,5 +1,5 @@
 import { TextDocument, TextEditor, Uri, workspace } from '../../test/__mocks__/vscode';
-import { isDiffLikeUri, isDiffViewVisible, shouldSkipInDiffView } from '../../diff-context';
+import { isDiffLikeUri, isDiffViewVisible, isEditorInDiffView, shouldSkipInDiffView } from '../../diff-context';
 
 const mockGetConfiguration = vi.fn().mockReturnValue({
   get: vi.fn().mockReturnValue(false),
@@ -71,6 +71,38 @@ describe('diff-context', () => {
 
     it('returns false for empty editors array', () => {
       expect(isDiffViewVisible([])).toBe(false);
+    });
+  });
+
+  describe('isEditorInDiffView', () => {
+    it('returns true if the editor document has a diff-like URI', () => {
+      const diffEditor = new TextEditor(new TextDocument(Uri.parse('git:/file.md'), 'markdown', 1, ''), []);
+      expect(isEditorInDiffView(diffEditor as any, [diffEditor as any])).toBe(true);
+    });
+
+    it('returns true if another visible editor in the SAME viewColumn has a diff-like URI (side-by-side diff)', () => {
+      const leftDiff = new TextEditor(new TextDocument(Uri.parse('git:/file.md'), 'markdown', 1, ''), []);
+      (leftDiff as any).viewColumn = 1;
+      const rightWorking = new TextEditor(new TextDocument(Uri.file('/file.md'), 'markdown', 1, ''), []);
+      (rightWorking as any).viewColumn = 1;
+
+      expect(isEditorInDiffView(rightWorking as any, [leftDiff as any, rightWorking as any])).toBe(true);
+    });
+
+    it('returns false for normal file when diff editor is in a DIFFERENT viewColumn (split pane)', () => {
+      const diffEditor = new TextEditor(new TextDocument(Uri.parse('git:/file.md'), 'markdown', 1, ''), []);
+      (diffEditor as any).viewColumn = 1;
+      const normalMarkdown = new TextEditor(new TextDocument(Uri.file('/README.md'), 'markdown', 1, ''), []);
+      (normalMarkdown as any).viewColumn = 2;
+
+      expect(isEditorInDiffView(normalMarkdown as any, [diffEditor as any, normalMarkdown as any])).toBe(false);
+    });
+
+    it('returns false when no editors have diff-like URIs', () => {
+      const normalEditor = new TextEditor(new TextDocument(Uri.file('/README.md'), 'markdown', 1, ''), []);
+      (normalEditor as any).viewColumn = 1;
+
+      expect(isEditorInDiffView(normalEditor as any, [normalEditor as any])).toBe(false);
     });
   });
 
