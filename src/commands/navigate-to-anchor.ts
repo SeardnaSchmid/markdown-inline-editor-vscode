@@ -7,6 +7,7 @@ async function navigateToAnchor(anchor: string, documentUri: string): Promise<vo
   const editor = await vscode.window.showTextDocument(document);
   const text = document.getText();
   const lines = text.split(/\r?\n/);
+  const cleanAnchor = anchor.startsWith('#') ? anchor.substring(1) : anchor;
 
   for (let i = 0; i < lines.length; i++) {
     const headingMatch = lines[i].match(/^#+\s+(.+)$/);
@@ -14,7 +15,7 @@ async function navigateToAnchor(anchor: string, documentUri: string): Promise<vo
       continue;
     }
 
-    if (normalizeAnchorText(headingMatch[1]) !== anchor) {
+    if (normalizeAnchorText(headingMatch[1].trim()) !== cleanAnchor) {
       continue;
     }
 
