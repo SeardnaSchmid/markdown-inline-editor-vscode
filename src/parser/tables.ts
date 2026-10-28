@@ -52,10 +52,10 @@ export function cellHasMixedFormatting(cell: TableCell): boolean {
       return true;
     }
     // Check if the single formatted child has nested mixed formatting (e.g., **Bold and _italic_**)
-    if ('children' in child && Array.isArray((child as any).children)) {
-      const grandChildren = (child as any).children;
+    if ('children' in child && Array.isArray(child.children)) {
+      const grandChildren: ReadonlyArray<{ type: string }> = child.children;
       if (grandChildren.length > 1) {
-        return grandChildren.some((gc: any) =>
+        return grandChildren.some((gc) =>
           gc.type === 'strong' || gc.type === 'emphasis' ||
           gc.type === 'delete' || gc.type === 'inlineCode'
         );

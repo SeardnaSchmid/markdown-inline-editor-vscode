@@ -1,7 +1,7 @@
 import { DecorationOptions, Range, TextEditor, TextDocument, TextDocumentChangeEvent, Selection, window, TextEditorSelectionChangeKind, Memento } from 'vscode';
 import { DecorationRange, DecorationType, MermaidBlock, MathRegion, ScopeRange } from './parser';
 import { config } from './config';
-import { isDiffLikeUri, isDiffViewVisible, isEditorInDiffView } from './diff-context';
+import { isEditorInDiffView } from './diff-context';
 import { MarkdownParseCache } from './markdown-parse-cache';
 import {
   applyFilteredDecorations,

@@ -44,21 +44,22 @@ export function isDiffLikeUri(uri: vscode.Uri): boolean {
  */
 export function isEditorInDiffView(
   targetEditor: vscode.TextEditor,
-  visibleEditors: readonly vscode.TextEditor[] = (vscode.window as any)?.visibleTextEditors ?? [],
+  visibleEditors: readonly vscode.TextEditor[] = vscode.window?.visibleTextEditors ?? [],
 ): boolean {
   if (isDiffLikeUri(targetEditor.document.uri)) {
     return true;
   }
 
-  const tabGroups = (vscode.window as any)?.tabGroups?.all;
+  const tabGroups = vscode.window?.tabGroups?.all;
   if (Array.isArray(tabGroups)) {
     const targetUriStr = targetEditor.document.uri.toString();
     for (const group of tabGroups) {
       const activeTab = group?.activeTab;
       const input = activeTab?.input;
       if (input && typeof input === 'object') {
-        const originalUri = (input as any).original?.toString?.();
-        const modifiedUri = (input as any).modified?.toString?.();
+        const diffInput = input as { original?: vscode.Uri; modified?: vscode.Uri };
+        const originalUri = diffInput.original?.toString?.();
+        const modifiedUri = diffInput.modified?.toString?.();
         if (targetUriStr === originalUri || targetUriStr === modifiedUri) {
           return true;
         }
