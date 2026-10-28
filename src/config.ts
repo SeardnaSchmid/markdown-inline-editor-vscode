@@ -124,6 +124,12 @@ export const config = {
       if (typeof value !== 'number' || !Number.isFinite(value)) return 48;
       return Math.min(200, Math.max(3, Math.floor(value)));
     },
+    /** Color the header row cells with the theme's link color. */
+    highlightHeaders(): boolean {
+      return vscode.workspace
+        .getConfiguration(SECTION)
+        .get<boolean>('tables.highlightHeaders', true);
+    },
     /** Draw a thin rule under every data row (preview style only). */
     rowSeparators(): boolean {
       return vscode.workspace

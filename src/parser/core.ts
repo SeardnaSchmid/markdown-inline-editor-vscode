@@ -1419,6 +1419,9 @@ export class MarkdownParser {
     const colAligns = node.align ?? [];
     const isPreviewStyle = config.tables.style() === "preview";
     const drawRowSeparators = isPreviewStyle && config.tables.rowSeparators();
+    const headerColor = config.tables.highlightHeaders()
+      ? "var(--vscode-textLink-foreground)"
+      : undefined;
     // Each preview cell box is the content width plus one character width of padding
     // on either side, which stands in for the hidden pipe.
     const boxWidthOf = (colWidth: number): number => colWidth + CELL_PADDING_CH * 2;
@@ -1471,7 +1474,10 @@ export class MarkdownParser {
         // Plain / escaped: use AST extraction (handles \| → |, \\ → \)
         const astCell = i < row.children.length ? row.children[i] as TableCell : undefined;
         const isMixed = astCell ? this.cellHasMixedFormatting(astCell) : false;
-        const cellStyle = isMixed ? undefined : this.detectCellStyle(trimmedContent);
+        const detectedStyle = isMixed ? undefined : this.detectCellStyle(trimmedContent);
+        const cellStyle = rowIdx === 0 && headerColor
+          ? { ...detectedStyle, color: headerColor }
+          : detectedStyle;
         const showRaw = isMixed;
         const displayContent = (astCell && !showRaw)
           ? this.extractCellPlainText(astCell)

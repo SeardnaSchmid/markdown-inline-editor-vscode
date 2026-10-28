@@ -10,6 +10,7 @@ export interface DecorationRange {
     fontWeight?: string;
     fontStyle?: string;
     textDecoration?: string;
+    color?: string;
   };
   slug?: string;
   issueNumber?: number;

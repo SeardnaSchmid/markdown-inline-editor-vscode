@@ -73,6 +73,17 @@ describe('config.tables', () => {
     });
   });
 
+  describe('highlightHeaders', () => {
+    it('defaults to true', () => {
+      expect(config.tables.highlightHeaders()).toBe(true);
+    });
+
+    it('returns false when disabled', () => {
+      stub('tables.highlightHeaders', false);
+      expect(config.tables.highlightHeaders()).toBe(false);
+    });
+  });
+
   describe('rowSeparators', () => {
     it('defaults to true', () => {
       expect(config.tables.rowSeparators()).toBe(true);

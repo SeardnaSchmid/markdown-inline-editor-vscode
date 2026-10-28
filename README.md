@@ -153,6 +153,8 @@ Everything works out of the box. If you want to tune the experience, open Settin
   - Caps runaway columns in `preview` style; longer text is clipped in the rendered view and shown in full when the cursor enters the table.
 - **Table row separators** (`tables.rowSeparators`, default `true`)
   - Turn off for a table without horizontal lines between rows.
+- **Table header highlight** (`tables.highlightHeaders`, default `true`)
+  - Colors header row cells with the theme's link color. Turn off to render headers like body cells.
 - **Syntax colors** (`colors.heading1` … `colors.checkbox`, 15 options including `inlineCodeBackground`)
   - Optional hex overrides (e.g. `#e06c75`) for headings, links, list markers, inline code, inline code background, emphasis, blockquote, image, horizontal rule, checkbox. Unset or invalid values use theme-derived defaults (for headings, unset keeps the editor’s markdown heading syntax colors rather than forcing a single foreground). See [Customizable Syntax Colors][feat-customizable-syntax-colors].
 

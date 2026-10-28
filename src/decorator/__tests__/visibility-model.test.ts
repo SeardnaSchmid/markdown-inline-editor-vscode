@@ -190,6 +190,29 @@ describe('table decoration rendering', () => {
     expect(cells[0].renderOptions?.before?.contentText).toBe(' bold ');
     expect(cells[0].renderOptions?.before?.fontWeight).toBe('bold');
   });
+
+  it('applies cellStyle color to tableCell', () => {
+    const text = '| Head |\nother';
+    const decs: DecorationRange[] = [
+      {
+        startPos: 0,
+        endPos: 1,
+        type: 'tableCell',
+        replacement: ' Head ',
+        cellStyle: { color: 'var(--vscode-textLink-foreground)' },
+      } as any,
+    ];
+    const editor = makeEditor(text, 1, 0);
+    const result = filterDecorationsForEditor(
+      editor as any,
+      decs,
+      [],
+      text,
+      (s, e, t) => simpleRangeFactory(s, e, t),
+    );
+    const cells = result.get('tableCell') as any[];
+    expect(cells[0].renderOptions?.before?.color).toBe('var(--vscode-textLink-foreground)');
+  });
 });
 
 describe('preview-style table layout', () => {

@@ -363,6 +363,31 @@ describe('MarkdownParser - Tables', () => {
     });
   });
 
+  describe('header highlighting', () => {
+    const table = '| **Name** | Value |\n|---|---|\n| a | 1 |';
+    const headerColor = 'var(--vscode-textLink-foreground)';
+
+    it('colors header cells and keeps their detected style by default', () => {
+      const cells = byType(parser.extractDecorations(table), 'tableCell');
+      expect(cells[0].cellStyle).toEqual({ fontWeight: 'bold', color: headerColor });
+      expect(cells[1].cellStyle).toEqual({ color: headerColor });
+    });
+
+    it('does not color body cells', () => {
+      const cells = byType(parser.extractDecorations(table), 'tableCell');
+      expect(cells[2].cellStyle).toBeUndefined();
+      expect(cells[3].cellStyle).toBeUndefined();
+    });
+
+    it('leaves header cells uncolored when disabled', () => {
+      const cells = withConfig({ 'tables.highlightHeaders': false }, () =>
+        byType(parser.extractDecorations(table), 'tableCell'),
+      );
+      expect(cells[0].cellStyle).toEqual({ fontWeight: 'bold' });
+      expect(cells[1].cellStyle).toBeUndefined();
+    });
+  });
+
   describe('links in cells', () => {
     it('should include link label text in cell replacement', () => {
       const md = '| Col |\n|-----|\n| [label](https://example.com) |';

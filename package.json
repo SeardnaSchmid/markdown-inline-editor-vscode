@@ -184,6 +184,12 @@
           "description": "Maximum table column width, in character widths",
           "markdownDescription": "Maximum width of a single table column, in character widths. Longer cell content is clipped in the rendered view; move the cursor into the table to see the full raw text. Only used when `#markdownInlineEditor.tables.style#` is `preview`."
         },
+        "markdownInlineEditor.tables.highlightHeaders": {
+          "type": "boolean",
+          "default": true,
+          "description": "Highlight table header cells",
+          "markdownDescription": "Color the cells of a table's header row with the theme's link color."
+        },
         "markdownInlineEditor.tables.rowSeparators": {
           "type": "boolean",
           "default": true,

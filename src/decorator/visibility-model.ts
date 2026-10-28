@@ -238,6 +238,7 @@ export function filterDecorationsForEditor(
           if (decoration.cellStyle.fontWeight) beforeOpts.fontWeight = decoration.cellStyle.fontWeight;
           if (decoration.cellStyle.fontStyle) beforeOpts.fontStyle = decoration.cellStyle.fontStyle;
           if (decoration.cellStyle.textDecoration) beforeOpts.textDecoration = decoration.cellStyle.textDecoration;
+          if (decoration.cellStyle.color) beforeOpts.color = decoration.cellStyle.color;
         }
         if (decoration.type === 'tableRule') {
           applyTableRuleStyle(beforeOpts, decoration);
