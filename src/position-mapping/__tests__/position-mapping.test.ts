@@ -96,6 +96,15 @@ describe('normalizeAnchorText', () => {
   it('handles empty string', () => {
     expect(normalizeAnchorText('')).toBe('');
   });
+
+  it('keeps CJK letters in heading slugs', () => {
+    expect(normalizeAnchorText('Skills 目录')).toBe('skills-目录');
+    expect(normalizeAnchorText('skills-目录')).toBe('skills-目录');
+  });
+
+  it('decodes percent-encoded CJK fragments', () => {
+    expect(normalizeAnchorText('skills-%E7%9B%AE%E5%BD%95')).toBe('skills-目录');
+  });
 });
 
 describe('normalizeToLF', () => {

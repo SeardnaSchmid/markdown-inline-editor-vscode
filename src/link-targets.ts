@@ -4,6 +4,56 @@ export type LinkTarget =
   | { kind: "command"; command: string; args: unknown[] }
   | { kind: "uri"; uri: vscode.Uri };
 
+/**
+ * Percent-decode a markdown href path so `link%20test.md` maps to `link test.md`.
+ *
+ * @param path - Raw href path, possibly percent-encoded
+ * @returns Decoded path, or the original string if decoding fails
+ */
+function decodeMarkdownHrefPath(path: string): string {
+  // joinPath would otherwise look for a filename that literally contains "%20"
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
+/**
+ * Split `file.md#heading` so the fragment is not treated as part of the filename.
+ *
+ * @param href - Relative or absolute markdown href
+ * @returns Path and fragment (empty string when no hash is present)
+ */
+function splitMarkdownHref(href: string): { path: string; fragment: string } {
+  const hashIndex = href.indexOf("#");
+  if (hashIndex === -1) {
+    return { path: href, fragment: "" };
+  }
+  return { path: href.slice(0, hashIndex), fragment: href.slice(hashIndex + 1) };
+}
+
+/**
+ * Resolve a local markdown/image path after decoding percent-encoding.
+ *
+ * @param hrefPath - Path without fragment
+ * @param documentUri - URI of the document that contains the href
+ * @returns File URI, or undefined when the path is empty
+ */
+function resolveLocalMarkdownUri(
+  hrefPath: string,
+  documentUri: vscode.Uri,
+): vscode.Uri | undefined {
+  const decoded = decodeMarkdownHrefPath(hrefPath);
+  if (!decoded) {
+    return;
+  }
+  if (decoded.startsWith("/")) {
+    return vscode.Uri.file(decoded);
+  }
+  return vscode.Uri.joinPath(documentUri, "..", decoded);
+}
+
 export function resolveImageTarget(
   url: string,
   documentUri: vscode.Uri,
@@ -11,10 +61,6 @@ export function resolveImageTarget(
   const trimmed = url.trim();
   if (!trimmed) {
     return;
-  }
-
-  if (trimmed.startsWith("/")) {
-    return vscode.Uri.file(trimmed);
   }
 
   if (
@@ -30,19 +76,7 @@ export function resolveImageTarget(
     }
   }
 
-  let targetPath = trimmed;
-  let fragment: string | undefined;
-  const hashIdx = trimmed.indexOf("#");
-  if (hashIdx !== -1) {
-    targetPath = trimmed.substring(0, hashIdx);
-    fragment = trimmed.substring(hashIdx + 1);
-  }
-
-  const baseUri = targetPath.startsWith("/")
-    ? vscode.Uri.file(targetPath)
-    : vscode.Uri.joinPath(documentUri, "..", targetPath);
-
-  return fragment !== undefined ? baseUri.with({ fragment }) : baseUri;
+  return resolveLocalMarkdownUri(trimmed, documentUri);
 }
 
 export function resolveLinkTarget(
@@ -79,33 +113,22 @@ export function resolveLinkTarget(
     }
   }
 
-  // Split optional fragment/anchor (#heading) from the file path so that
-  // links like "./foo.md#test" navigate to the file and anchor instead of
-  // treating "#test" as part of the file name.
-  let targetPath = trimmed;
-  let fragment: string | undefined;
-  const hashIdx = trimmed.indexOf("#");
-  if (hashIdx !== -1) {
-    targetPath = trimmed.substring(0, hashIdx);
-    fragment = trimmed.substring(hashIdx + 1);
+  const { path, fragment } = splitMarkdownHref(trimmed);
+  const uri = resolveLocalMarkdownUri(path, documentUri);
+  if (!uri) {
+    return;
   }
 
-  const baseUri = targetPath.startsWith("/")
-    ? vscode.Uri.file(targetPath)
-    : vscode.Uri.joinPath(documentUri, "..", targetPath);
-
+  // Relative file plus fragment: open that file then jump to the heading
   if (fragment) {
     return {
       kind: "command",
       command: "markdown-inline-editor.navigateToAnchor",
-      args: [fragment, baseUri.toString()],
+      args: [fragment, uri.toString()],
     };
   }
 
-  return {
-    kind: "uri",
-    uri: baseUri,
-  };
+  return { kind: "uri", uri };
 }
 
 export function toCommandUri(command: string, args: unknown[]): vscode.Uri {

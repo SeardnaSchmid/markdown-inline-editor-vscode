@@ -3,10 +3,6 @@ import * as vscode from 'vscode';
 import { createNavigateToAnchorCommand } from '../navigate-to-anchor';
 
 describe('navigate-to-anchor command', () => {
-  beforeEach(() => {
-    (vscode.window.showInformationMessage as Mock).mockClear();
-  });
-
   it('opens document and selects matching heading', async () => {
     let handler: ((anchor: string, documentUri: string) => Promise<void>) | undefined;
     (vscode.commands.registerCommand as Mock).mockImplementation((_id, cb) => {
@@ -55,8 +51,8 @@ describe('navigate-to-anchor command', () => {
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Anchor "missing" not found');
   });
 
-  it('opens document and selects matching heading in CRLF documents', async () => {
-    let handler: ((anchor: string, documentUri: string) => Promise<void>) | undefined;
+  it('matches headings in CRLF documents', async () => {
+    let handler: ((anchor: string | unknown[], documentUri?: string) => Promise<void>) | undefined;
     (vscode.commands.registerCommand as Mock).mockImplementation((_id, cb) => {
       handler = cb;
       return { dispose: vi.fn() };
@@ -66,18 +62,45 @@ describe('navigate-to-anchor command', () => {
       vscode.Uri.file('/test.md'),
       'markdown',
       1,
-      '# Title\r\n## My Heading\r\nContent'
+      '# Title\r\n## My Heading\r\n'
     );
     const editor = new (vscode.TextEditor as any)(document, []);
     editor.revealRange = vi.fn();
     (vscode.workspace.openTextDocument as Mock).mockResolvedValue(document);
     (vscode.window.showTextDocument as Mock).mockResolvedValue(editor);
+    (vscode.window.showInformationMessage as Mock).mockClear();
 
     createNavigateToAnchorCommand();
     await handler?.('my-heading', 'file:///test.md');
 
-    expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
     expect(editor.revealRange).toHaveBeenCalled();
+    expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
     expect(editor.selection?.active.line).toBe(1);
+  });
+
+  it('matches CJK heading slugs such as #skills-目录', async () => {
+    let handler: ((anchor: string | unknown[], documentUri?: string) => Promise<void>) | undefined;
+    (vscode.commands.registerCommand as Mock).mockImplementation((_id, cb) => {
+      handler = cb;
+      return { dispose: vi.fn() };
+    });
+
+    const document = new (vscode.TextDocument as any)(
+      vscode.Uri.file('/test.md'),
+      'markdown',
+      1,
+      '# Title\r\n## Skills 目录\r\n'
+    );
+    const editor = new (vscode.TextEditor as any)(document, []);
+    editor.revealRange = vi.fn();
+    (vscode.workspace.openTextDocument as Mock).mockResolvedValue(document);
+    (vscode.window.showTextDocument as Mock).mockResolvedValue(editor);
+    (vscode.window.showInformationMessage as Mock).mockClear();
+
+    createNavigateToAnchorCommand();
+    await handler?.('skills-目录', 'file:///test.md');
+
+    expect(editor.revealRange).toHaveBeenCalled();
+    expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
   });
 });
