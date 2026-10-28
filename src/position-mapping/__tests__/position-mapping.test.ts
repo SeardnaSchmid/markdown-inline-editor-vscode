@@ -75,10 +75,10 @@ describe('normalizeAnchorText', () => {
     expect(normalizeAnchorText('a  b')).toBe('a-b'); // spaces → hyphens → collapsed
   });
 
-  it('converts leading/trailing spaces to hyphens (spaces are replaced before trim)', () => {
-    // Spaces are first replaced with hyphens, then trim() removes only whitespace — not hyphens.
-    // So '  test  ' → '-test-' (spaces at edges become hyphens, trim has nothing to remove).
-    expect(normalizeAnchorText('  test  ')).toBe('-test-');
+  it('trims leading/trailing spaces without creating leading/trailing hyphens', () => {
+    // Matches JSDoc example: normalizeAnchorText('  Test  123  ') returns 'test-123'
+    expect(normalizeAnchorText('  test  ')).toBe('test');
+    expect(normalizeAnchorText('  Test  123  ')).toBe('test-123');
   });
 
   it('handles numbers', () => {
