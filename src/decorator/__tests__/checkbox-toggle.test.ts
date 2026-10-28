@@ -117,4 +117,47 @@ describe('handleCheckboxClick', () => {
       expect(edits[0].newText).toBe('x');
     });
   });
+
+  describe('rendered checkbox click at list marker position', () => {
+    it('toggles [ ] to [x] when cursor lands at column 0 on the list marker', () => {
+      // In VS Code, clicking the rendered checkbox decoration lands cursor at startPos (char 0 on '-')
+      const editor = makeEditor('- [ ] task', 0);
+      const result = handleCheckboxClick(editor as any);
+      expect(result).toBe(true);
+      expect(workspace.applyEdit).toHaveBeenCalledTimes(1);
+      const edit = (workspace.applyEdit as Mock).mock.calls[0][0] as WorkspaceEdit;
+      expect(edit.getEdits()[0].newText).toBe('x');
+    });
+
+    it('toggles [ ] to [x] when cursor is on the space between marker and brackets', () => {
+      const editor = makeEditor('- [ ] task', 1);
+      const result = handleCheckboxClick(editor as any);
+      expect(result).toBe(true);
+    });
+
+    it('toggles indented task list item when cursor is on the indented marker', () => {
+      const editor = makeEditor('  - [ ] task', 2);
+      const result = handleCheckboxClick(editor as any);
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('does not toggle inside code', () => {
+    it('returns false when cursor is inside empty brackets in a fenced code block', () => {
+      const markdown = '```js\nconst arr = [ ];\n```';
+      const doc = new TextDocument(Uri.file('test.md'), 'markdown', 1, markdown);
+      const editor = {
+        document: doc,
+        selection: new Selection(new Position(1, 13), new Position(1, 13)),
+      };
+      expect(handleCheckboxClick(editor as any)).toBe(false);
+      expect(workspace.applyEdit).not.toHaveBeenCalled();
+    });
+
+    it('returns false when cursor is inside empty brackets in inline code', () => {
+      const editor = makeEditor('Here is code: `const a = [ ];` in text', 26);
+      expect(handleCheckboxClick(editor as any)).toBe(false);
+      expect(workspace.applyEdit).not.toHaveBeenCalled();
+    });
+  });
 });
