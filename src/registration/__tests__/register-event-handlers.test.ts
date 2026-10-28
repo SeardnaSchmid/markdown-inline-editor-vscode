@@ -158,4 +158,40 @@ describe('registerEventHandlers', () => {
     expect(decorator.recreateColorDependentTypes).toHaveBeenCalledTimes(2);
     expect(decorator.clearMathDecorationCache).toHaveBeenCalledTimes(1);
   });
+
+  it('drops the parse cache when a table setting changes', () => {
+    let configurationListener:
+      | ((event: { affectsConfiguration: (section: string) => boolean }) => void)
+      | undefined;
+
+    vscode.workspace.onDidChangeConfiguration = vi.fn((listener) => {
+      configurationListener = listener;
+      return { dispose: vi.fn() };
+    }) as any;
+
+    const decorator = {
+      setActiveEditor: vi.fn(),
+      updateDecorationsForSelection: vi.fn(),
+      updateDecorationsFromChange: vi.fn(),
+      renameFile: vi.fn(),
+      updateDiffViewDecorationSetting: vi.fn(),
+      recreateGhostFaintDecorationType: vi.fn(),
+      recreateFrontmatterDelimiterDecorationType: vi.fn(),
+      recreateCodeBlockLanguageDecorationType: vi.fn(),
+      recreateColorDependentTypes: vi.fn(),
+      clearMathDecorationCache: vi.fn(),
+      clearCache: vi.fn(),
+    };
+    const linkClickHandler = { setEnabled: vi.fn() };
+
+    registerEventHandlers(decorator as any, linkClickHandler as any);
+
+    configurationListener?.({
+      affectsConfiguration: (section: string) => section === 'markdownInlineEditor.tables',
+    });
+
+    // Table settings feed the parser, so the cached decorations have to be discarded
+    expect(decorator.clearCache).toHaveBeenCalledTimes(1);
+    expect(decorator.updateDecorationsForSelection).toHaveBeenCalled();
+  });
 });

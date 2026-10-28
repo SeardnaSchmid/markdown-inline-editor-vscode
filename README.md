@@ -16,7 +16,7 @@ Your files stay 100% standard Markdown. This extension uses editor decorations �
 
 - **No preview pane needed:** headings, emphasis, links, images, lists, code, **GFM tables**, math, and Mermaid render inline where you write.
 - **Rendered -> Ghost -> Raw syntax shadowing:** Markdown markers stay out of the way until you need them, then fade in on the active line or fully reveal for precise edits.
-- **GFM tables:** pipe characters and cell text are drawn as an aligned grid; place the cursor anywhere in the table to reveal raw `|` syntax for editing.
+- **GFM tables:** pipe characters and cell text are drawn as an aligned grid; place the cursor anywhere in the table to reveal raw `|` syntax for editing. Set `tables.style` to `preview` for a preview-pane look instead — pipes hidden, columns laid out as fixed-width boxes that line up whatever the font does with full-width (CJK) characters, bold header and thin rules.
 - **Inline Mermaid and LaTeX math:** render `` ```mermaid `` diagrams, `$...$`, `$$...$$`, and `` ```math `` blocks directly in the editor.
 - **Interactive Markdown:** click task list checkboxes to toggle them, hover links to see targets, and hover images to preview them.
 - **Safe for real workflows:** files remain plain Markdown, and diffs stay raw by default for Git, merge editor, and Copilot inline review contexts.
@@ -144,6 +144,15 @@ Everything works out of the box. If you want to tune the experience, open Settin
   - Style GitHub-style `@user` / `#123`; optional clickable targets when forge context is available. See [Mentions & references][feat-mentions-references].
 - **Emoji shortcodes** (`emojis.enabled`, default `true`)
   - Disable if you prefer seeing `:shortcode:` text.
+- **Table style** (`tables.style`, default `grid`)
+  - `grid` is the character-grid look (`│` pipes and a dashed separator row), which relies on the font rendering full-width characters at exactly the configured ratio.
+  - `preview` hides the `|` pipes and lays every cell out as a fixed-width box, so columns line up no matter how your font renders full-width characters. Adds a bold header, a rule under the header row and thin row separators. Worth switching on for documents that mix CJK and ASCII text, or if you use a proportional font.
+- **CJK column width** (`tables.cjkWidthRatio`, default `2`)
+  - How wide a full-width character is compared to an ASCII one when sizing columns. Raise it if CJK text is clipped, lower it if columns look too wide.
+- **Maximum column width** (`tables.maxColumnWidth`, default `48`)
+  - Caps runaway columns in `preview` style; longer text is clipped in the rendered view and shown in full when the cursor enters the table.
+- **Table row separators** (`tables.rowSeparators`, default `true`)
+  - Turn off for a table without horizontal lines between rows.
 - **Syntax colors** (`colors.heading1` … `colors.checkbox`, 15 options including `inlineCodeBackground`)
   - Optional hex overrides (e.g. `#e06c75`) for headings, links, list markers, inline code, inline code background, emphasis, blockquote, image, horizontal rule, checkbox. Unset or invalid values use theme-derived defaults (for headings, unset keeps the editor’s markdown heading syntax colors rather than forcing a single foreground). See [Customizable Syntax Colors][feat-customizable-syntax-colors].
 
