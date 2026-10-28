@@ -33,6 +33,12 @@ export function processFrontmatter(
   if (openingLineEnd === -1) {
     return;
   }
+
+  const openingLineContent = text.substring(openingDelimiterStart, openingLineEnd);
+  if (!/^---\s*$/.test(openingLineContent)) {
+    return;
+  }
+
   const openingLineEndPos = openingLineEnd + 1;
 
   let searchPos = openingLineEndPos;
