@@ -1,6 +1,7 @@
 import type { TextEditorDecorationType } from 'vscode';
 import {
   HideDecorationType,
+  CheckboxMarkerDecorationType,
   TransparentDecorationType,
   GhostFaintDecorationType,
   BoldDecorationType,
@@ -65,6 +66,7 @@ type RegistryOptions = {
 
 export class DecorationTypeRegistry {
   private hideDecorationType!: TextEditorDecorationType;
+  private checkboxMarkerDecorationType!: TextEditorDecorationType;
   private transparentDecorationType!: TextEditorDecorationType;
   private ghostFaintDecorationType!: TextEditorDecorationType;
   private boldDecorationType!: TextEditorDecorationType;
@@ -105,6 +107,7 @@ export class DecorationTypeRegistry {
 
   constructor(private options: RegistryOptions) {
     this.hideDecorationType = HideDecorationType();
+    this.checkboxMarkerDecorationType = CheckboxMarkerDecorationType();
     this.transparentDecorationType = TransparentDecorationType();
     this.ghostFaintDecorationType = GhostFaintDecorationType(this.options.getGhostFaintOpacity());
     this.boldDecorationType = BoldDecorationType(this.options.getEmphasisColor?.());
@@ -175,6 +178,7 @@ export class DecorationTypeRegistry {
       ['horizontalRule', this.horizontalRuleDecorationType],
       ['checkboxUnchecked', this.checkboxUncheckedDecorationType],
       ['checkboxChecked', this.checkboxCheckedDecorationType],
+      ['checkboxMarker', this.checkboxMarkerDecorationType],
       ['frontmatter', this.frontmatterDecorationType],
       ['frontmatterDelimiter', this.frontmatterDelimiterDecorationType],
       ['emoji', this.emojiDecorationType],

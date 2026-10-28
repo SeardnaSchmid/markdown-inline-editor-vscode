@@ -48,6 +48,19 @@ export function filterDecorationsForEditor(
     'checkboxUnchecked',
     'checkboxChecked',
   ]);
+  // A checkbox is rendered as several decorations over one source run (the
+  // `[ ]` box plus a collapsed marker). They must reveal together, and only when
+  // the cursor/selection is actually on the checkbox. The `listItem` scope spans
+  // the whole line, so a scope-based reveal would show the bullet whenever the
+  // cursor is anywhere on the line.
+  const checkboxTypes = new Set<DecorationType>([
+    'checkboxUnchecked',
+    'checkboxChecked',
+    'checkboxMarker',
+  ]);
+  const checkboxScopes = scopes.filter((scope) => scope.kind === 'checkbox');
+  const checkboxUnitRange = (range: Range): Range =>
+    checkboxScopes.find((scope) => scope.range.intersection(range) !== undefined)?.range ?? range;
   const headingTypes = new Set<DecorationType>([
     'heading',
     'heading1',
@@ -117,6 +130,17 @@ export function filterDecorationsForEditor(
           selectionOverlayRanges.push(intersection);
         }
       }
+    }
+
+    if (checkboxTypes.has(decoration.type)) {
+      if (selectionOrCursorOverlaps(checkboxUnitRange(range))) {
+        // Raw state: show the actual `- [ ]` as one unit.
+        continue;
+      }
+      const ranges = filtered.get(decoration.type) || [];
+      ranges.push(range);
+      filtered.set(decoration.type, ranges);
+      continue;
     }
 
     if (selectionOnlyMarkerTypes.has(decoration.type)) {

@@ -12,13 +12,12 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       const markdown = '- [ ] Task item';
       const result = parser.extractDecorations(markdown);
 
-      // No listItem when checkbox is present; single checkbox covers marker + "[ ]"
+      // No listItem when checkbox is present. The bullet is collapsed with a
+      // `hide` decoration; the checkbox covers only the `[ ]` syntax so the
+      // rendered box can sit on real characters.
       expect(result.filter(d => d.type === 'listItem').length).toBe(0);
-      expect(result).toContainEqual({
-        startPos: 0,
-        endPos: 5,
-        type: 'checkboxUnchecked'
-      });
+      expect(result).toContainEqual({ startPos: 0, endPos: 2, type: 'checkboxMarker' });
+      expect(result).toContainEqual({ startPos: 2, endPos: 5, type: 'checkboxUnchecked' });
     });
 
     it('should detect unchecked checkbox with asterisk marker', () => {
@@ -26,11 +25,8 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       const result = parser.extractDecorations(markdown);
 
       expect(result.filter(d => d.type === 'listItem').length).toBe(0);
-      expect(result).toContainEqual({
-        startPos: 0,
-        endPos: 5,
-        type: 'checkboxUnchecked'
-      });
+      expect(result).toContainEqual({ startPos: 0, endPos: 2, type: 'checkboxMarker' });
+      expect(result).toContainEqual({ startPos: 2, endPos: 5, type: 'checkboxUnchecked' });
     });
 
     it('should detect unchecked checkbox with plus marker', () => {
@@ -38,11 +34,8 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       const result = parser.extractDecorations(markdown);
 
       expect(result.filter(d => d.type === 'listItem').length).toBe(0);
-      expect(result).toContainEqual({
-        startPos: 0,
-        endPos: 5,
-        type: 'checkboxUnchecked'
-      });
+      expect(result).toContainEqual({ startPos: 0, endPos: 2, type: 'checkboxMarker' });
+      expect(result).toContainEqual({ startPos: 2, endPos: 5, type: 'checkboxUnchecked' });
     });
   });
 
@@ -52,11 +45,8 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       const result = parser.extractDecorations(markdown);
 
       expect(result.filter(d => d.type === 'listItem').length).toBe(0);
-      expect(result).toContainEqual({
-        startPos: 0,
-        endPos: 5,
-        type: 'checkboxChecked'
-      });
+      expect(result).toContainEqual({ startPos: 0, endPos: 2, type: 'checkboxMarker' });
+      expect(result).toContainEqual({ startPos: 2, endPos: 5, type: 'checkboxChecked' });
     });
 
     it('should detect checked checkbox with uppercase X', () => {
@@ -64,11 +54,8 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       const result = parser.extractDecorations(markdown);
 
       expect(result.filter(d => d.type === 'listItem').length).toBe(0);
-      expect(result).toContainEqual({
-        startPos: 0,
-        endPos: 5,
-        type: 'checkboxChecked'
-      });
+      expect(result).toContainEqual({ startPos: 0, endPos: 2, type: 'checkboxMarker' });
+      expect(result).toContainEqual({ startPos: 2, endPos: 5, type: 'checkboxChecked' });
     });
   });
 
@@ -91,11 +78,8 @@ describe('MarkdownParser - Checkbox/Task List', () => {
       const result = parser.extractDecorations(markdown);
 
       expect(result.filter(d => d.type === 'listItem').length).toBe(0);
-      expect(result).toContainEqual({
-        startPos: 2,
-        endPos: 7,
-        type: 'checkboxUnchecked'
-      });
+      expect(result).toContainEqual({ startPos: 2, endPos: 4, type: 'checkboxMarker' });
+      expect(result).toContainEqual({ startPos: 4, endPos: 7, type: 'checkboxUnchecked' });
     });
   });
 
