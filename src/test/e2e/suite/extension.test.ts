@@ -51,12 +51,15 @@ suite('Extension E2E', () => {
     assert.ok(ext?.isActive, 'Extension did not activate');
   });
 
-  test('toggle command is registered', async () => {
+  test('mode commands are registered', async () => {
     const commands = await vscode.commands.getCommands(true);
-    assert.ok(
-      commands.includes('mdInline.toggleDecorations'),
-      'mdInline.toggleDecorations not registered'
-    );
+    for (const id of [
+      'mdInline.switchToVisual',
+      'mdInline.switchToHybrid',
+      'mdInline.switchToRaw',
+    ]) {
+      assert.ok(commands.includes(id), `${id} not registered`);
+    }
   });
 
   test('decorates markdown documents without error', async () => {
@@ -113,21 +116,20 @@ suite('Extension E2E', () => {
     assert.strictEqual(doc.languageId, 'markdown');
   });
 
-  test('toggle command executes without error on active markdown editor', async () => {
+  test('mode commands execute without error on active markdown editor', async () => {
     const doc = await vscode.workspace.openTextDocument({
       language: 'markdown',
       content: '# Heading\n**bold** _italic_',
     });
     await vscode.window.showTextDocument(doc);
     await delay(300);
-    await vscode.commands.executeCommand('mdInline.toggleDecorations');
+    await vscode.commands.executeCommand('mdInline.switchToRaw');
     await delay(200);
-    await vscode.commands.executeCommand('mdInline.toggleDecorations');
+    await vscode.commands.executeCommand('mdInline.switchToHybrid');
   });
 
-  // Issue #28: per-file toggle state
-  // Toggling decorations on file A must not affect file B.
-  test('#28 — toggle is per-file: disabling one file leaves others enabled', async () => {
+  // Global mode applies across all markdown files
+  test('mode switch is global across markdown files', async () => {
     const docA = await vscode.workspace.openTextDocument({
       language: 'markdown',
       content: '# File A\n**bold**',
@@ -137,27 +139,23 @@ suite('Extension E2E', () => {
       content: '# File B\n_italic_',
     });
 
-    // Show file A and disable decorations for it
+    // Show file A and switch to raw
     await vscode.window.showTextDocument(docA);
     await delay(300);
     assert.ok(decoratorApi?.isEnabled(), 'File A should start enabled');
-    await vscode.commands.executeCommand('mdInline.toggleDecorations');
+    await vscode.commands.executeCommand('mdInline.switchToRaw');
     await delay(200);
     assert.strictEqual(decoratorApi?.isEnabled(), false, 'File A should now be disabled');
 
-    // Switch to file B — it should remain enabled
+    // Switch to file B — global mode stays raw
     await vscode.window.showTextDocument(docB);
     await delay(300);
-    assert.ok(decoratorApi?.isEnabled(), 'File B should still be enabled');
+    assert.strictEqual(decoratorApi?.isEnabled(), false, 'File B should share global raw mode');
 
-    // Switch back to file A — it should still be disabled
-    await vscode.window.showTextDocument(docA);
-    await delay(300);
-    assert.strictEqual(decoratorApi?.isEnabled(), false, 'File A should still be disabled');
-
-    // Re-enable file A to leave state clean for subsequent tests
-    await vscode.commands.executeCommand('mdInline.toggleDecorations');
+    // Re-enable hybrid to leave state clean for subsequent tests
+    await vscode.commands.executeCommand('mdInline.switchToHybrid');
     await delay(200);
+    assert.ok(decoratorApi?.isEnabled(), 'File B should now be enabled');
   });
 
   // Regression test for issue #58:
@@ -1097,7 +1095,7 @@ suite('Extension E2E', () => {
     try {
       // Phase 1: decorations OFF — applyDecorations short-circuits, onApply not called
       phase = 1;
-      await vscode.commands.executeCommand('mdInline.toggleDecorations');
+      await vscode.commands.executeCommand('mdInline.switchToRaw');
       await vscode.commands.executeCommand('cursorMove', { to: 'right' });
       await delay(300);
       assert.strictEqual(
@@ -1108,7 +1106,7 @@ suite('Extension E2E', () => {
 
       // Phase 2: decorations ON — applyDecorations runs, onApply fires with count > 0
       phase = 2;
-      await vscode.commands.executeCommand('mdInline.toggleDecorations');
+      await vscode.commands.executeCommand('mdInline.switchToHybrid');
       await vscode.commands.executeCommand('cursorMove', { to: 'right' });
       await delay(300);
       assert.ok(
@@ -1119,7 +1117,7 @@ suite('Extension E2E', () => {
       decoratorApi.onApply = undefined;
       // Guard: ensure decorations end up ON regardless of test outcome
       if (!decoratorApi.isEnabled()) {
-        await vscode.commands.executeCommand('mdInline.toggleDecorations');
+        await vscode.commands.executeCommand('mdInline.switchToHybrid');
       }
     }
   });

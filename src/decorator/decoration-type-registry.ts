@@ -1,6 +1,9 @@
 import type { TextEditorDecorationType } from 'vscode';
 import {
   HideDecorationType,
+  RenderedEditHideDecorationType,
+  RenderedEditBeforeMarkerDecorationType,
+  RenderedEditTableHeaderDecorationType,
   CheckboxMarkerDecorationType,
   TransparentDecorationType,
   GhostFaintDecorationType,
@@ -67,6 +70,9 @@ type RegistryOptions = {
 
 export class DecorationTypeRegistry {
   private hideDecorationType!: TextEditorDecorationType;
+  private renderedEditHideDecorationType!: TextEditorDecorationType;
+  private renderedEditBeforeMarkerDecorationType!: TextEditorDecorationType;
+  private renderedEditTableHeaderDecorationType!: TextEditorDecorationType;
   private checkboxMarkerDecorationType!: TextEditorDecorationType;
   private transparentDecorationType!: TextEditorDecorationType;
   private ghostFaintDecorationType!: TextEditorDecorationType;
@@ -109,6 +115,9 @@ export class DecorationTypeRegistry {
 
   constructor(private options: RegistryOptions) {
     this.hideDecorationType = HideDecorationType();
+    this.renderedEditHideDecorationType = RenderedEditHideDecorationType();
+    this.renderedEditBeforeMarkerDecorationType = RenderedEditBeforeMarkerDecorationType();
+    this.renderedEditTableHeaderDecorationType = RenderedEditTableHeaderDecorationType();
     this.checkboxMarkerDecorationType = CheckboxMarkerDecorationType();
     this.transparentDecorationType = TransparentDecorationType();
     this.ghostFaintDecorationType = GhostFaintDecorationType(this.options.getGhostFaintOpacity());
@@ -203,6 +212,18 @@ export class DecorationTypeRegistry {
     return this.ghostFaintDecorationType;
   }
 
+  getRenderedEditHideDecorationType(): TextEditorDecorationType {
+    return this.renderedEditHideDecorationType;
+  }
+
+  getRenderedEditBeforeMarkerDecorationType(): TextEditorDecorationType {
+    return this.renderedEditBeforeMarkerDecorationType;
+  }
+
+  getRenderedEditTableHeaderDecorationType(): TextEditorDecorationType {
+    return this.renderedEditTableHeaderDecorationType;
+  }
+
   recreateCodeDecorationType(): void {
     this.recreateDecorationType(
       this.codeDecorationType,
@@ -290,6 +311,9 @@ export class DecorationTypeRegistry {
       decorationType.dispose();
     }
     this.ghostFaintDecorationType.dispose();
+    this.renderedEditHideDecorationType.dispose();
+    this.renderedEditBeforeMarkerDecorationType.dispose();
+    this.renderedEditTableHeaderDecorationType.dispose();
   }
 
   private recreateDecorationType(

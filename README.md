@@ -9,7 +9,7 @@
 Your files stay 100% standard Markdown. This extension uses editor decorations — it never rewrites your document.
 
 - **Install:** [VS Code Marketplace][marketplace] • [OpenVSX][openvsx] • [Download VSIX][releases]
-- **Jump to:** [Why people install it](#why-people-install-it) • [Demo](#demo) • [Get started](#get-started) • [3-state syntax shadowing](#3-state-syntax-shadowing) • [Customize](#customize-optional) • [Supported features](#supported-features) • [FAQ][faq]
+- **Jump to:** [Why people install it](#why-people-install-it) • [Demo](#demo) • [Get started](#get-started) • [3-state syntax shadowing](#3-state-syntax-shadowing) • [Supported features](#supported-features) • [Visual mode](#visual-mode) • [Customize](#customize-optional) • [FAQ][faq]
 - **Project:** [Repository][repo] • [Changelog][changelog] • [Issues][issues] • [Roadmap](#roadmap)
 
 ## Why people install it
@@ -40,7 +40,7 @@ Your files stay 100% standard Markdown. This extension uses editor decorations �
 3. **Start typing** – formatting appears inline while syntax is hidden (**Rendered** state).
 4. **Move the cursor** onto a line – syntax fades in for edit cues (**Ghost** state).
 5. **Click/select** inside formatted text – raw Markdown becomes fully visible (**Raw** state).
-6. **Toggle anytime** – Command Palette → **Toggle Markdown Decorations** (command id: `mdInline.toggleDecorations`) or use the editor title bar eye icon.
+6. **Switch mode anytime** – Use the editor title bar mode button (`V` → `H` → `R`) or Command Palette → **Markdown: Switch to Visual / Hybrid / Raw**.
 
 **Requirement:** VS Code 1.88+ (Cursor is supported too).
 
@@ -58,7 +58,7 @@ VS Code’s Markdown preview is great for reading. Markdown Inline Editor is for
 
 ## Commands
 
-- **Toggle Markdown Decorations** (`mdInline.toggleDecorations`): Enable/disable inline Markdown rendering.
+- **Markdown: Switch to Visual / Hybrid / Raw** (`mdInline.switchToVisual`, `mdInline.switchToHybrid`, `mdInline.switchToRaw`): Switch directly to a shared mode across all Markdown files, or click the editor title bar button (`V` / `H` / `R` with `MD`) to advance `Visual` → `Hybrid` → `Raw`.
 
 ## Recommended extensions (optional)
 
@@ -130,9 +130,25 @@ The extension supports the following Markdown (and common GitHub-flavored) featu
 - [x] **Show Raw Markdown in Diffs** • [Details][feat-show-raw-markdown-in-diffs] • [Issue #20](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/20)
 - [x] **Customizable Syntax Colors** (headings, links, lists, code, emphasis, blockquote, image, horizontal rule, checkbox) • [Details][feat-customizable-syntax-colors] • [Issue #49](https://github.com/SeardnaSchmid/markdown-inline-editor-vscode/issues/49)
 
+## Visual Mode
+
+An editing mode alongside **Hybrid** (default, reveals raw syntax at cursor) and **Raw** (plain Markdown). Click the editor title icon (`V`/`H`/`R` + `MD`) to switch (`Visual` → `Hybrid` → `Raw`), or set `markdownInlineEditor.defaultMode` (`visual` / `hybrid` / `raw`).
+
+- **No raw reveal:** Markdown stays rendered while typing, navigating, and selecting; cursor skips hidden markers (`Left`/`Right`, `Shift`, `Ctrl`), stays visible at boundaries, and at an element boundary typing favors the side the cursor came from (step into a neighbor and back once to switch sides).
+- **Safe deletion:** `Backspace`/`Delete` skip hidden markers and clean up empty constructs; deleting a selection removes fully covered elements cleanly while keeping markers of partially selected ones intact.
+- **Visible-text copy/cut:** `Ctrl+C`/`Ctrl+X` copy only rendered text without Markdown syntax (use Hybrid or Raw mode for raw Markdown); multi-cell table selections copy as tab-separated columns.
+- **Editable GFM tables:** tables stay aligned and editable inside cells; pipes and separator rows are protected and the cursor stays within cells.
+
+**Exceptions (same as Hybrid mode):**
+- **Mermaid diagrams** (`` ```mermaid ``) and **LaTeX/Math** (`$...$`, `$$...$$`, `` ```math ``) still reveal raw source when the cursor enters them.
+- **Link/image URLs** stay hidden — switch to Hybrid or Raw mode to edit target URLs.
+
 ## Customize (optional)
 
 Everything works out of the box. If you want to tune the experience, open Settings and search for **“Markdown Inline Editor”** (all keys start with `markdownInlineEditor.`).
+
+- **Default mode** (`defaultMode`, default `hybrid`)
+  - Choose the initial global mode (`visual`, `hybrid`, or `raw`) before toggling.
 
 - **Ghost markers visibility** (`decorations.ghostFaintOpacity`, default `0.3`)
   - Lower it for a cleaner look, raise it for stronger edit cues.

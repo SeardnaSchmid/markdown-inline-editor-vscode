@@ -145,8 +145,28 @@ export function isFullWidth(code: number): boolean {
   );
 }
 
+const EMOJI_PRESENTATION_REGEX = /\p{Emoji_Presentation}/u;
+
+function isZeroWidthCodePoint(code: number): boolean {
+  return (
+    code === 0x200d || // ZWJ
+    code === 0x200b || // ZWSP
+    code === 0x20e3 || // Combining enclosing keycap
+    (code >= 0xfe00 && code <= 0xfe0f) || // Variation selectors
+    (code >= 0xe0100 && code <= 0xe01ef) || // Variation selectors supplement
+    (code >= 0x0300 && code <= 0x036f) || // Combining diacritical marks
+    (code >= 0x1ab0 && code <= 0x1aff) ||
+    (code >= 0x1dc0 && code <= 0x1dff) ||
+    (code >= 0x20d0 && code <= 0x20ff) ||
+    (code >= 0xfe20 && code <= 0xfe2f) ||
+    (code >= 0x1f3fb && code <= 0x1f3ff) // Emoji skin-tone modifiers
+  );
+}
+
 /**
  * Estimates the display width of a string in character widths (ASCII character = 1).
+ * Handles CJK full-width characters, wide emoji (`✅`, `⚠️`), variation selectors (`U+FE0F`),
+ * combining marks, and ZWJ emoji sequences.
  *
  * @param {string} plain - Text to measure
  * @param {number} cjkWidthRatio - Width of a full-width character relative to an ASCII one
@@ -156,10 +176,40 @@ export function measureTextWidth(
   plain: string,
   cjkWidthRatio: number = DEFAULT_CJK_WIDTH_RATIO,
 ): number {
+  const chars = Array.from(plain);
   let width = 0;
-  for (const char of plain) {
-    width += isFullWidth(char.codePointAt(0)!) ? cjkWidthRatio : 1;
+
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    const code = ch.codePointAt(0)!;
+
+    // ZWJ joins the following glyph into the same single emoji cell.
+    if (code === 0x200d) {
+      i++;
+      continue;
+    }
+
+    if (isZeroWidthCodePoint(code)) {
+      continue;
+    }
+
+    const nextCode = i + 1 < chars.length ? chars[i + 1].codePointAt(0)! : -1;
+    if (nextCode === 0xfe0f) {
+      // Text-presentation symbol forced to wide emoji presentation (e.g. ⚠️, ❤️).
+      width += 2;
+      i++;
+      continue;
+    }
+
+    if (isFullWidth(code)) {
+      width += cjkWidthRatio;
+    } else if (EMOJI_PRESENTATION_REGEX.test(ch)) {
+      width += 2;
+    } else {
+      width += 1;
+    }
   }
+
   return width;
 }
 

@@ -1,4 +1,4 @@
-import { window, ThemeColor, ColorThemeKind } from 'vscode';
+import { window, ThemeColor, ColorThemeKind, DecorationRangeBehavior } from 'vscode';
 
 /**
  * Opacity value for brightness adjustment overlays.
@@ -32,6 +32,40 @@ export function HideDecorationType() {
     after: {
       contentText: '',
     },
+  });
+}
+
+/**
+ * Hides markdown syntax with zero font size instead of display:none so Monaco
+ * keeps rendering a visible caret right before closing delimiters (e.g. `**word|** `).
+ * ClosedClosed prevents newly typed characters at either boundary from inheriting font-size:0.
+ */
+export function RenderedEditHideDecorationType() {
+  return window.createTextEditorDecorationType({
+    textDecoration: 'none; font-size: 0 !important;',
+    letterSpacing: '0',
+    color: 'transparent',
+    rangeBehavior: DecorationRangeBehavior.ClosedClosed,
+  });
+}
+
+/**
+ * Renders visual replacements (`• `, `1. `, `│`, emoji) on zero-width anchor ranges
+ * in Rendered Edit mode so they inherit the native editor font size without display:none.
+ */
+export function RenderedEditBeforeMarkerDecorationType() {
+  return window.createTextEditorDecorationType({
+    rangeBehavior: DecorationRangeBehavior.ClosedClosed,
+  });
+}
+
+/**
+ * Styles table header cell text directly in Rendered Edit mode while keeping text editable.
+ */
+export function RenderedEditTableHeaderDecorationType(highlightHeaders = true) {
+  return window.createTextEditorDecorationType({
+    fontWeight: 'bold',
+    ...(highlightHeaders ? { color: new ThemeColor('textLink.foreground') } : {}),
   });
 }
 

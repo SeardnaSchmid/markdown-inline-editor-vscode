@@ -2,16 +2,29 @@ import * as vscode from 'vscode';
 import { config } from '../config';
 import { Decorator } from '../decorator';
 import { LinkClickHandler } from '../link-click-handler';
+import type { MarkdownParseCache } from '../markdown-parse-cache';
+import type { RenderedEditCursorGuard } from '../rendered-edit/cursor-guard';
 
 export function registerEventHandlers(
   decorator: Decorator,
-  linkClickHandler: LinkClickHandler
+  linkClickHandler: LinkClickHandler,
+  parseCache?: MarkdownParseCache,
+  cursorGuard?: RenderedEditCursorGuard
 ): vscode.Disposable[] {
   return [
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       decorator.setActiveEditor(editor);
     }),
     vscode.window.onDidChangeTextEditorSelection((event) => {
+      if (
+        parseCache &&
+        cursorGuard &&
+        decorator.isRenderedEditMode() &&
+        event.textEditor === decorator.activeEditor &&
+        cursorGuard.handleSelectionChange(event.textEditor, parseCache, event.kind)
+      ) {
+        return;
+      }
       decorator.updateDecorationsForSelection(event.kind);
     }),
     vscode.workspace.onDidChangeTextDocument((event) => {
@@ -25,6 +38,10 @@ export function registerEventHandlers(
       }
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('markdownInlineEditor.defaultMode')) {
+        decorator.refreshModeFromConfig();
+      }
+
       if (event.affectsConfiguration('markdownInlineEditor.defaultBehaviors.diffView.applyDecorations')) {
         const diffViewApplyDecorations = config.diffView.applyDecorations();
         decorator.updateDiffViewDecorationSetting(!diffViewApplyDecorations);
