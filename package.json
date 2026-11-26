@@ -1,7 +1,7 @@
 {
   "name": "markdown-inline-editor-vscode",
   "displayName": "Markdown Inline Editor",
-  "version": "1.24.2",
+  "version": "1.24.3",
   "description": "WYSIWYG inline markdown editor - hide syntax, focus on content",
   "license": "MIT",
   "author": "SeardnaSchmid",
@@ -46,20 +46,129 @@
   "contributes": {
     "commands": [
       {
-        "command": "mdInline.toggleDecorations",
-        "title": "Toggle Markdown Decorations",
-        "icon": "$(eye)"
+        "command": "mdInline.switchToVisual",
+        "title": "Markdown: Switch to Visual",
+        "icon": {
+          "light": "assets/icons/mode-raw-light.svg",
+          "dark": "assets/icons/mode-raw-dark.svg"
+        }
+      },
+      {
+        "command": "mdInline.switchToHybrid",
+        "title": "Markdown: Switch to Hybrid",
+        "icon": {
+          "light": "assets/icons/mode-visual-light.svg",
+          "dark": "assets/icons/mode-visual-dark.svg"
+        }
+      },
+      {
+        "command": "mdInline.switchToRaw",
+        "title": "Markdown: Switch to Raw",
+        "icon": {
+          "light": "assets/icons/mode-hybrid-light.svg",
+          "dark": "assets/icons/mode-hybrid-dark.svg"
+        }
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "mdInline.toggleDecorations",
-          "when": "editorLangId == markdown || editorLangId == md || editorLangId == mdx || editorLangId == markdoc || editorLangId == mdc || editorLangId == juliamarkdown || editorLangId == rmarkdown",
+          "command": "mdInline.switchToHybrid",
+          "when": "(editorLangId == markdown || editorLangId == md || editorLangId == mdx || editorLangId == markdoc || editorLangId == mdc || editorLangId == juliamarkdown || editorLangId == rmarkdown) && mdInline.mode == 'visual'",
+          "group": "navigation"
+        },
+        {
+          "command": "mdInline.switchToRaw",
+          "when": "(editorLangId == markdown || editorLangId == md || editorLangId == mdx || editorLangId == markdoc || editorLangId == mdc || editorLangId == juliamarkdown || editorLangId == rmarkdown) && mdInline.mode != 'visual' && mdInline.mode != 'raw'",
+          "group": "navigation"
+        },
+        {
+          "command": "mdInline.switchToVisual",
+          "when": "(editorLangId == markdown || editorLangId == md || editorLangId == mdx || editorLangId == markdoc || editorLangId == mdc || editorLangId == juliamarkdown || editorLangId == rmarkdown) && mdInline.mode == 'raw'",
           "group": "navigation"
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "mdInline.renderedEdit.backspace",
+        "key": "backspace",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !editorReadonly"
+      },
+      {
+        "command": "mdInline.renderedEdit.deleteRight",
+        "key": "delete",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !editorReadonly"
+      },
+      {
+        "command": "mdInline.renderedEdit.deleteWordLeft",
+        "key": "ctrl+backspace",
+        "mac": "alt+backspace",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !editorReadonly"
+      },
+      {
+        "command": "mdInline.renderedEdit.deleteWordRight",
+        "key": "ctrl+delete",
+        "mac": "alt+delete",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !editorReadonly"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorLeft",
+        "key": "left",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !editorHasSelection && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorRight",
+        "key": "right",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !editorHasSelection && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorLeftSelect",
+        "key": "shift+left",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorRightSelect",
+        "key": "shift+right",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorWordLeft",
+        "key": "ctrl+left",
+        "mac": "alt+left",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorWordRight",
+        "key": "ctrl+right",
+        "mac": "alt+right",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorWordLeftSelect",
+        "key": "ctrl+shift+left",
+        "mac": "alt+shift+left",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.cursorWordRightSelect",
+        "key": "ctrl+shift+right",
+        "mac": "alt+shift+right",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !suggestWidgetVisible"
+      },
+      {
+        "command": "mdInline.renderedEdit.copy",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "editorTextFocus && mdInline.renderedEditMode"
+      },
+      {
+        "command": "mdInline.renderedEdit.cut",
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "when": "editorTextFocus && mdInline.renderedEditMode && !editorReadonly"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -82,6 +191,21 @@
     "configuration": {
       "title": "Markdown Inline Editor",
       "properties": {
+        "markdownInlineEditor.defaultMode": {
+          "type": "string",
+          "enum": [
+            "visual",
+            "hybrid",
+            "raw"
+          ],
+          "enumDescriptions": [
+            "Visual: keep Markdown rendered while editing inside elements.",
+            "Hybrid: render Markdown and reveal raw syntax under cursor/selection.",
+            "Raw: plain Markdown without inline decorations."
+          ],
+          "default": "hybrid",
+          "description": "Default initial Markdown mode"
+        },
         "markdownInlineEditor.defaultBehaviors.diffView.applyDecorations": {
           "type": "boolean",
           "default": false,

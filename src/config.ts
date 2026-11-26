@@ -19,7 +19,18 @@ function getColorConfig(key: string): string | undefined {
   );
 }
 
+export type DefaultMarkdownMode = 'visual' | 'hybrid' | 'raw';
+
 export const config = {
+  defaultMode(): DefaultMarkdownMode {
+    const value = vscode.workspace
+      .getConfiguration(SECTION)
+      .get<string>('defaultMode', 'hybrid');
+    if (value === 'visual' || value === 'raw') {
+      return value;
+    }
+    return 'hybrid';
+  },
   diffView: {
     applyDecorations(): boolean {
       return vscode.workspace

@@ -9,7 +9,6 @@ import {
   createRange as createEditorRange,
   isSelectionOrCursorInsideOffsets as selectionIntersectsOffsets,
 } from './decorator/editor-decoration-applier';
-import { FileDecorationStateStore } from './decorator/file-decoration-state';
 import { MermaidUpdateCoordinator } from './decorator/mermaid-update-coordinator';
 import { DecorationTypeRegistry } from './decorator/decoration-type-registry';
 import { filterDecorationsForEditor, ScopeEntry } from './decorator/visibility-model';
@@ -21,6 +20,12 @@ import { MermaidHoverIndicatorDecorationType } from './decorations';
 import { isSupportedMarkdownLanguage } from './language-support';
 import { logDebug, logPerformanceMetric } from './logging';
 import { applyMathDecorationsForEditor } from './decorator/math-region-application';
+import {
+  applyRenderedEditFilteredDecorations,
+  clearRenderedEditDecorations,
+  filterRenderedEditDecorations,
+} from './rendered-edit/applier';
+import { type MarkdownMode, RenderedEditModeController } from './rendered-edit/mode-controller';
 
 /**
  * Performance and caching constants.
@@ -84,12 +89,12 @@ export class Decorator {
   );
   private mathDecorations = new MathDecorations();
   private mermaidHoverIndicatorDecorationType = MermaidHoverIndicatorDecorationType();
-  private readonly fileDecorationState: FileDecorationStateStore;
+  private readonly renderedEditMode: RenderedEditModeController;
   private readonly updateScheduler: DecoratorUpdateScheduler;
 
   constructor(parseCache: MarkdownParseCache, workspaceState?: Memento) {
     this.parseCache = parseCache;
-    this.fileDecorationState = new FileDecorationStateStore(workspaceState);
+    this.renderedEditMode = new RenderedEditModeController(workspaceState);
     this.updateScheduler = new DecoratorUpdateScheduler(
       PERFORMANCE_CONSTANTS.DEBOUNCE_TIMEOUT_MS,
       PERFORMANCE_CONSTANTS.IDLE_CALLBACK_TIMEOUT_MS
@@ -134,10 +139,18 @@ export class Decorator {
     this.updateScheduler.cancel();
 
     if (!textEditor) {
+      this.activeEditor = undefined;
+      this.syncModeUI();
       return;
     }
 
     this.activeEditor = textEditor;
+    this.syncModeUI();
+
+    if (this.isMarkdownDocument() && !this.isEnabledForUri(this.activeEditor.document.uri.toString())) {
+      this.clearAllDecorations();
+      return;
+    }
 
     // Update immediately when switching editors (no debounce)
     this.updateDecorationsForSelection();
@@ -253,26 +266,59 @@ export class Decorator {
     });
   }
 
-  /**
-   * Toggle decorations on/off.
-   * 
-   * @returns {boolean} The new state (true = enabled, false = disabled)
-   */
-  toggleDecorations(): boolean {
+  setMode(mode: MarkdownMode): MarkdownMode {
     const uri = this.activeEditor?.document.uri.toString();
-    if (!uri) { return true; }
+    const next = this.renderedEditMode.setMode(uri, mode);
+    return this.applyGlobalMode(next);
+  }
 
-    const next = this.fileDecorationState.toggle(uri);
-
-    if (next) {
-      // Re-enable: update decorations immediately
-      this.updateDecorationsForSelection();
-    } else {
-      // Disable: clear all decorations
-      this.clearAllDecorations();
+  private applyGlobalMode(next: MarkdownMode): MarkdownMode {
+    this.syncModeUI();
+    if (!this.activeEditor || !this.isMarkdownDocument()) {
+      return next;
     }
-
+    if (next === 'raw') {
+      this.clearAllDecorations();
+    } else {
+      this.updateDecorationsForSelection();
+    }
     return next;
+  }
+
+  getMode(): MarkdownMode {
+    const uri = this.activeEditor?.document.uri.toString();
+    if (!uri) { return config.defaultMode(); }
+    return this.renderedEditMode.getMode(uri);
+  }
+
+  isRenderedEditMode(): boolean {
+    if (!this.activeEditor || !this.isMarkdownDocument()) {
+      return false;
+    }
+    if (this.skipDecorationsInDiffView && this.isDiffEditor()) {
+      return false;
+    }
+    return this.renderedEditMode.getMode(this.activeEditor.document.uri.toString()) === 'visual';
+  }
+
+  refreshModeFromConfig(): void {
+    this.renderedEditMode.clearCachedDefault();
+    this.syncModeUI();
+    if (!this.activeEditor || !this.isMarkdownDocument()) {
+      return;
+    }
+    if (this.getMode() === 'raw') {
+      this.clearAllDecorations();
+    } else {
+      this.updateDecorationsForSelection();
+    }
+  }
+
+  private syncModeUI(): void {
+    this.renderedEditMode.syncUI(
+      this.activeEditor?.document.uri.toString(),
+      this.isRenderedEditMode()
+    );
   }
 
   /**
@@ -282,43 +328,34 @@ export class Decorator {
    */
   isEnabled(): boolean {
     const uri = this.activeEditor?.document.uri.toString();
-    if (!uri) { return true; }
+    if (!uri) { return config.defaultMode() !== 'raw'; }
     return this.isEnabledForUri(uri);
   }
 
   /**
-   * Get the enabled state for a specific file URI, loading from persisted
-   * state on first access.
-   *
-   * @param {string} uri - The file URI string
-   * @returns {boolean} True if decorations are enabled for that file
+   * Returns true when decorations are enabled under the current global mode.
    */
   private isEnabledForUri(uri: string): boolean {
-    return this.fileDecorationState.isEnabled(uri);
+    return this.renderedEditMode.getMode(uri) !== 'raw';
   }
 
-  /**
-   * Migrate toggle state when a file is renamed.
-   *
-   * @param {string} oldUri - The old file URI string
-   * @param {string} newUri - The new file URI string
-   */
-  renameFile(oldUri: string, newUri: string): void {
-    this.fileDecorationState.renameFile(oldUri, newUri);
+  renameFile(_oldUri: string, _newUri: string): void {
+    // Mode is global across all files; nothing per-URI to migrate.
   }
 
   /**
    * Updates the diff view decoration setting.
-   * 
+   *
    * @param {boolean} skipDecorations - True to skip decorations in diff views (show raw markdown)
    */
   updateDiffViewDecorationSetting(skipDecorations: boolean): void {
     this.skipDecorationsInDiffView = skipDecorations;
+    this.syncModeUI();
   }
 
   /**
    * Clear all decorations from the active editor.
-   * 
+   *
    * @private
    */
   private clearAllDecorations(): void {
@@ -330,9 +367,10 @@ export class Decorator {
     for (const decorationType of this.decorationTypes.getMap().values()) {
       this.activeEditor.setDecorations(decorationType, []);
     }
-    
+
     // Also clear ghost faint decoration (not in decorationTypeMap)
     this.activeEditor.setDecorations(this.decorationTypes.getGhostFaintDecorationType(), []);
+    clearRenderedEditDecorations(this.activeEditor, this.decorationTypes);
     this.mermaidDecorations.clear(this.activeEditor);
     this.mathDecorations.clear(this.activeEditor);
     this.activeEditor.setDecorations(this.mermaidHoverIndicatorDecorationType, []);
@@ -349,9 +387,10 @@ export class Decorator {
 
     const document = this.activeEditor.document;
 
-    // Early exit if decorations are disabled for this file
+    // Early exit if decorations are disabled (Raw mode)
     if (!this.isEnabledForUri(document.uri.toString())) {
       logDebug('skip decoration update for disabled file', { uri: document.uri.toString() });
+      this.clearAllDecorations();
       return;
     }
 
@@ -544,18 +583,25 @@ export class Decorator {
       return new Map();
     }
 
+    const rangeFactory = (startPos: number, endPos: number, text: string) =>
+      this.createRange(startPos, endPos, text);
+
+    if (this.isRenderedEditMode()) {
+      return filterRenderedEditDecorations(this.activeEditor, decorations, originalText, rangeFactory);
+    }
+
     return filterDecorationsForEditor(
       this.activeEditor,
       decorations,
       scopes,
       originalText,
-      (startPos, endPos, text) => this.createRange(startPos, endPos, text)
+      rangeFactory
     );
   }
 
   /**
    * Applies filtered decorations to the editor.
-   * 
+   *
    * @private
    * @param {Map<DecorationType, Array<Range | DecorationOptions>>} filteredDecorations - Decorations grouped by type
    */
@@ -563,6 +609,16 @@ export class Decorator {
     if (!this.activeEditor) {
       return;
     }
+    if (this.isRenderedEditMode()) {
+      applyRenderedEditFilteredDecorations(
+        this.activeEditor,
+        filteredDecorations,
+        this.decorationTypes,
+        this.onApply
+      );
+      return;
+    }
+    clearRenderedEditDecorations(this.activeEditor, this.decorationTypes);
     applyFilteredDecorations(this.activeEditor, filteredDecorations, this.decorationTypes, this.onApply);
   }
 
@@ -602,6 +658,18 @@ export class Decorator {
    * @param {TextDocumentChangeEvent} event - The document change event
    */
   updateDecorationsFromChange(event: TextDocumentChangeEvent): void {
+    if (
+      this.activeEditor &&
+      event.document === this.activeEditor.document &&
+      this.isMarkdownDocument() &&
+      this.isRenderedEditMode() &&
+      this.parseCache.tryIncrementalTableUpdate(event)
+    ) {
+      this.updateScheduler.cancel();
+      this.updateDecorationsInternal();
+      return;
+    }
+
     // For now, always invalidate cache and do full parse
     this.invalidateCache(event.document);
 

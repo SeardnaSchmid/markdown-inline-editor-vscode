@@ -2,53 +2,35 @@ import type { Mock } from 'vitest';
 import * as vscode from 'vscode';
 import { createToggleDecorationsCommand } from '../toggle-decorations';
 
-describe('toggle-decorations command', () => {
-  it('registers command and shows resulting state', async () => {
-    let handler: (() => void) | undefined;
-    (vscode.commands.registerCommand as Mock).mockImplementation((_id, cb) => {
-      handler = cb;
-      return { dispose: vi.fn() };
-    });
-
-    const decorator = {
-      toggleDecorations: vi.fn(() => false),
-      activeEditor: {
-        document: {
-          uri: { toString: () => 'file:///test.md' },
-        },
-      },
-    };
-    vi.spyOn(vscode.workspace, 'asRelativePath' as any).mockReturnValue('test.md');
-
-    createToggleDecorationsCommand(decorator as any);
-    handler?.();
-
-    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
-      'mdInline.toggleDecorations',
-      expect.any(Function)
-    );
-    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
-      'Markdown decorations disabled for test.md'
-    );
+describe('mode commands', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('falls back to a generic file label without an active editor', () => {
-    let handler: (() => void) | undefined;
-    (vscode.commands.registerCommand as Mock).mockImplementation((_id, cb) => {
-      handler = cb;
+  it('registers the three switchTo mode commands calling setMode', () => {
+    const handlers = new Map<string, () => void>();
+    (vscode.commands.registerCommand as Mock).mockImplementation((id, cb) => {
+      handlers.set(id, cb);
       return { dispose: vi.fn() };
     });
 
     const decorator = {
-      toggleDecorations: vi.fn(() => true),
-      activeEditor: undefined,
+      setMode: vi.fn((mode) => mode),
     };
 
     createToggleDecorationsCommand(decorator as any);
-    handler?.();
 
-    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
-      'Markdown decorations enabled for this file'
-    );
+    expect(Array.from(handlers.keys())).toEqual([
+      'mdInline.switchToVisual',
+      'mdInline.switchToHybrid',
+      'mdInline.switchToRaw',
+    ]);
+
+    handlers.get('mdInline.switchToVisual')?.();
+    handlers.get('mdInline.switchToHybrid')?.();
+    handlers.get('mdInline.switchToRaw')?.();
+    expect(decorator.setMode).toHaveBeenNthCalledWith(1, 'visual');
+    expect(decorator.setMode).toHaveBeenNthCalledWith(2, 'hybrid');
+    expect(decorator.setMode).toHaveBeenNthCalledWith(3, 'raw');
   });
 });

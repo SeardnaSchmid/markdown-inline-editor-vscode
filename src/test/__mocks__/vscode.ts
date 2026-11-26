@@ -133,12 +133,24 @@ class MockTextDocument {
     return this.text;
   }
 
-  lineAt(line: number): { text: string } {
+  lineAt(line: number): { text: string; range: MockRange; rangeIncludingLineBreak: MockRange } {
     // Minimal subset of VS Code's TextDocument.lineAt used by tests.
     // Keep line splitting consistent with offsetAt (treat CRLF as single break).
     const lines = this.text.split(/\r\n|\r|\n/);
     const safeLine = Math.max(0, Math.min(line, Math.max(0, lines.length - 1)));
-    return { text: lines[safeLine] ?? "" };
+    const text = lines[safeLine] ?? "";
+    const start = { line: safeLine, character: 0 };
+    const end = { line: safeLine, character: text.length };
+    const nextStart = safeLine + 1 < lines.length ? { line: safeLine + 1, character: 0 } : end;
+    return {
+      text,
+      range: new MockRange(start, end),
+      rangeIncludingLineBreak: new MockRange(start, nextStart),
+    };
+  }
+
+  get lineCount(): number {
+    return this.text.split(/\r\n|\r|\n/).length;
   }
 
   offsetAt(position: { line: number; character: number }): number {
@@ -247,11 +259,31 @@ export function resetTextEditorDecorationTypeOptionsCapture(): void {
   lastTextEditorDecorationTypeOptions = undefined;
 }
 
+export enum DecorationRangeBehavior {
+  OpenOpen = 0,
+  ClosedClosed = 1,
+  OpenClosed = 2,
+  ClosedOpen = 3,
+}
+
+export enum StatusBarAlignment {
+  Left = 1,
+  Right = 2,
+}
+
 export const window = {
   createTextEditorDecorationType: vi.fn((options: unknown) => {
     lastTextEditorDecorationTypeOptions = options;
     return { dispose: vi.fn() };
   }),
+  createStatusBarItem: vi.fn(() => ({
+    text: '',
+    tooltip: '',
+    command: undefined as string | undefined,
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn(),
+  })),
   createOutputChannel: vi.fn(() => ({
     appendLine: vi.fn(),
     dispose: vi.fn(),
@@ -350,6 +382,22 @@ export const DocumentLink = class {
 export const CancellationToken = class {
   constructor(public isCancellationRequested: boolean = false) {}
 };
+
+export class Disposable {
+  constructor(private readonly callOnDispose: () => void) {}
+  dispose(): void {
+    this.callOnDispose();
+  }
+  static from(...disposables: Array<{ dispose: () => void }>): { dispose: () => void } {
+    return {
+      dispose: () => {
+        for (const d of disposables) {
+          d.dispose();
+        }
+      },
+    };
+  }
+}
 
 export const commands = {
   executeCommand: vi.fn(),

@@ -10,6 +10,8 @@ import { processSvg } from './mermaid/svg-processor';
 import { checkRecommendedExtensions } from './recommendations';
 import { registerEventHandlers } from './registration/register-event-handlers';
 import { registerProviders } from './registration/register-providers';
+import { RenderedEditCursorGuard } from './rendered-edit/cursor-guard';
+import { registerRenderedEditCommands } from './rendered-edit/edit-handlers';
 import { disposeLogger } from './logging';
 
 /**
@@ -43,10 +45,12 @@ export function activate(context: vscode.ExtensionContext): ExtensionApi {
   const { disposables: providerDisposables, linkClickHandler } = registerProviders(parseCache);
   linkClickHandler.setEnabled(config.links.singleClickOpen());
 
-  const eventDisposables = registerEventHandlers(decorator, linkClickHandler);
+  const cursorGuard = new RenderedEditCursorGuard();
+  const eventDisposables = registerEventHandlers(decorator, linkClickHandler, parseCache, cursorGuard);
   const commandDisposables = [
     createToggleDecorationsCommand(decorator),
     createNavigateToAnchorCommand(),
+    ...registerRenderedEditCommands(decorator, parseCache, cursorGuard),
   ];
 
   context.subscriptions.push(
